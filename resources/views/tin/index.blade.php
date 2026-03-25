@@ -1,5 +1,5 @@
 <x-app-layout>
-    <title>Biometric id - {{ $title ?? 'TIN Verification' }}</title>
+    <title>Hanan Verify - {{ $title ?? 'TIN Verification' }}</title>
     
     <div class="page-body">
         <div class="container-fluid">

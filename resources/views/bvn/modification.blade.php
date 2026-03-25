@@ -1,5 +1,5 @@
 <x-app-layout>
-    <title>Biometric id - {{ $title ?? 'BVN Modification' }}</title>
+    <title>Hanan Verify - {{ $title ?? 'BVN Modification' }}</title>
     <div class="page-body">
         <div class="container-fluid">
             <div class="page-title mb-3">

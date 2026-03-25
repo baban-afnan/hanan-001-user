@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Transaction;
 use App\Models\User;
+use App\Models\Wallet;
 use App\Services\TransactionService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
@@ -27,6 +28,7 @@ class UserController extends Controller
         $allUsers = User::count();
         $active = User::where('is_active', true)->count();
         $notActive = User::where('is_active', false)->count();
+        $totalWalletBalance = Wallet::sum('balance');
 
         if ($request->has('search')) {
             $search = $request->input('search');
@@ -39,10 +41,9 @@ class UserController extends Controller
             });
         }
 
-        $perPage = $request->input('per_page', 10);
-        $users = $query->paginate($perPage)->withQueryString();
+        $users = $query->get();
 
-        return view('admin.users.index', compact('users', 'allUsers', 'active', 'notActive'));
+        return view('admin.users.index', compact('users', 'allUsers', 'active', 'notActive', 'totalWalletBalance'));
     }
 
     public function show(User $user)

@@ -1,5 +1,5 @@
 <x-app-layout>
-    <title>Biometric id - Buy JAMB PIN</title>
+    <title>Hanan Verify - Buy JAMB PIN</title>
 
     <div class="row">
         <div class="col-xxl-12 col-xl-12">

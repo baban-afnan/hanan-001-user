@@ -135,7 +135,7 @@
 
             <div class="row g-4">
                 <!-- Total Users -->
-                <div class="col-md-4 col-12">
+                <div class="col-md-3 col-12">
                     <div class="card hover-shadow h-100 border-0">
                         <div class="card-body text-center">
                             <div class="mb-3">
@@ -151,7 +151,7 @@
                 </div>
 
                 <!-- Active Users -->
-                <div class="col-md-4 col-12">
+                <div class="col-md-3 col-12">
                     <div class="card hover-shadow h-100 border-0">
                         <div class="card-body text-center">
                             <div class="mb-3">
@@ -167,7 +167,7 @@
                 </div>
 
                 <!-- Inactive Users -->
-                <div class="col-md-4 col-12">
+                <div class="col-md-3 col-12">
                     <div class="card hover-shadow h-100 border-0">
                         <div class="card-body text-center">
                             <div class="mb-3">
@@ -181,6 +181,22 @@
                         </div>
                     </div>
                 </div>
+
+                <!-- Total Wallet Balance -->
+                <div class="col-md-3 col-12">
+                    <div class="card hover-shadow h-100 border-0">
+                        <div class="card-body text-center">
+                            <div class="mb-3">
+                                <i class="mdi mdi-wallet text-warning mdi-36px"></i>
+                                <p class="fw-semibold mt-2 text-muted">Total Wallet Balance</p>
+                            </div>
+                            <h2 class="fw-bold text-dark">
+                                ₦{{ number_format($totalWalletBalance, 2) }}
+                            </h2>
+                            <span class="badge bg-warning">Balance</span>
+                        </div>
+                    </div>
+                </div>
             </div>
 
             <!--  / Users -->
@@ -191,13 +207,9 @@
                             <h4 class="fw-bold text-center mb-4">Users List</h4>
 
                             <form method="GET" class="row g-2 mb-4 justify-content-center">
-                                <div class="col-md-4">
+                                <div class="col-md-6">
                                     <input type="text" name="search" value="{{ request('search') }}"
                                         placeholder="Search..." class="form-control">
-                                </div>
-                                <div class="col-md-2">
-                                    <input type="number" name="per_page" value="{{ request('per_page', 10) }}"
-                                        class="form-control" placeholder="Per page">
                                 </div>
                                 <div class="col-md-2">
                                     <button type="submit" class="btn btn-primary w-100">Filter</button>
@@ -222,7 +234,7 @@
                                     <tbody>
                                         @forelse($users as $user)
                                             <tr>
-                                                <td>{{ $loop->iteration }}</td>
+                                                <td>{{ $user->id }}</td>
                                                 <td>{{ $user->email }}</td>
                                                 <td>
                                                     {!! $user->name
@@ -265,16 +277,11 @@
                                         @endforelse
                                     </tbody>
                                 </table>
-
-                                <div class="d-flex justify-content-center mt-4">
-                                    {{ $users->links('pagination::bootstrap-4') }}
-                                </div>
                             </div>
                         </div>
                     </div>
                 </div>
             </div>
-
         </div>
 
 

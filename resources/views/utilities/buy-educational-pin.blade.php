@@ -1,5 +1,5 @@
 <x-app-layout>
-    <title>Biometric id - Buy Educational Pin</title>
+    <title>Hanan Verify - Buy Educational Pin</title>
 
     <!-- Start::row-1 -->
     <div class="row">

@@ -1,5 +1,5 @@
 <x-app-layout>
-    <title>Biometric id - {{ $title ?? 'Buy Airtime' }}</title>
+    <title>Hanan Verify - {{ $title ?? 'Buy Airtime' }}</title>
     
     
     

@@ -1,7 +1,7 @@
 @extends('layouts.dashboard')
 
 @section('content')
-    <title>Biometric id - Transaction Receipt</title>
+    <title>Hanan Verify - Transaction Receipt</title>
 
     @push('styles')
     <style>
@@ -183,7 +183,7 @@
             <div class="receipt-body">
                 <!-- Brand Header -->
                 <div class="receipt-brand">
-                    <h4>AA taska na rasulu Verify</h4>
+                    <h4>Hanan Verify</h4>
                     <p class="text-muted small mb-0">Official Transaction Receipt</p>
                 </div>
 

@@ -301,25 +301,28 @@ class NINverificationController extends Controller
              $transactionRef = 'Slip-' . (time() % 1000000000) . '-' . mt_rand(100, 999);
              $performedBy = $user->first_name . ' ' . $user->last_name;
  
-             Transaction::create([
-                 'transaction_ref' => $transactionRef,
-                 'user_id' => $user->id,
-                 'amount' => $servicePrice,
-                 'description' => "Slip Download: {$serviceField->field_name}",
-                 'type' => 'debit',
-                 'status' => 'Approved',
-                 'performed_by'    => $performedBy,
-                 'metadata' => [
-                     'service' => 'slip_download',
-                     'service_field' => $serviceField->field_name,
-                     'field_code' => $serviceField->field_code,
-                     'user_role' => $user->role,
-                     'price_details' => [
-                         'base_price' => $serviceField->base_price,
-                         'user_price' => $servicePrice,
-                     ],
-                 ],
-             ]);
+
+            $transaction = Transaction::create([
+                'referenceId' => $transactionRef,
+                'user_id' => $user->id,
+                'amount' => $servicePrice,
+                'service_type' => 'Slip Download',
+                'service_description' => "Slip Download - {$serviceField->field_name}",
+                'type' => 'debit',
+                'status' => 'Approved',
+                'performed_by' => $performedBy,
+                'metadata' => [
+                    'service' => 'slip_download',
+                    'service_field' => $serviceField->field_name,
+                    'field_code' => $serviceField->field_code,
+                    'user_role' => $user->role,
+                    'price_details' => [
+                        'base_price' => $serviceField->base_price,
+                        'user_price' => $servicePrice,
+                    ],
+                    'source' => 'Manual',
+                ],
+            ]);
  
              // Deduct wallet balance
              $wallet->decrement('balance', $servicePrice);

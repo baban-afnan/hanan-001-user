@@ -1,5 +1,5 @@
 <x-app-layout>
-    <title>Baya Jidda - {{ $title ?? 'CRM Request Form' }}</title>
+    <title>Hanan Verify - {{ $title ?? 'CRM Request Form' }}</title>
     <div class="page-body">
         <div class="container-fluid">
             <div class="page-title mb-3">

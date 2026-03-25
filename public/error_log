@@ -1,0 +1,10 @@
+[12-Feb-2026 12:53:19 UTC] PHP Warning:  require(/home/zepaapi1/aataskargebe.com.ng/public/../vendor/autoload.php): Failed to open stream: No such file or directory in /home/zepaapi1/aataskargebe.com.ng/public/index.php on line 13
+[12-Feb-2026 12:53:19 UTC] PHP Fatal error:  Uncaught Error: Failed opening required '/home/zepaapi1/aataskargebe.com.ng/public/../vendor/autoload.php' (include_path='.:/opt/alt/php82/usr/share/pear:/opt/alt/php82/usr/share/php:/usr/share/pear:/usr/share/php') in /home/zepaapi1/aataskargebe.com.ng/public/index.php:13
+Stack trace:
+#0 {main}
+  thrown in /home/zepaapi1/aataskargebe.com.ng/public/index.php on line 13
+[12-Feb-2026 12:53:22 UTC] PHP Warning:  require(/home/zepaapi1/aataskargebe.com.ng/public/../vendor/autoload.php): Failed to open stream: No such file or directory in /home/zepaapi1/aataskargebe.com.ng/public/index.php on line 13
+[12-Feb-2026 12:53:22 UTC] PHP Fatal error:  Uncaught Error: Failed opening required '/home/zepaapi1/aataskargebe.com.ng/public/../vendor/autoload.php' (include_path='.:/opt/alt/php82/usr/share/pear:/opt/alt/php82/usr/share/php:/usr/share/pear:/usr/share/php') in /home/zepaapi1/aataskargebe.com.ng/public/index.php:13
+Stack trace:
+#0 {main}
+  thrown in /home/zepaapi1/aataskargebe.com.ng/public/index.php on line 13

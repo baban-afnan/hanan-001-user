@@ -9333,7 +9333,8 @@
     --bs-yellow: #f6e84e;
     --bs-green: #46c35f;
     --bs-teal: #58d8a3;
-    --bs-cyan: #0db4bd; /* Your Color */
+    --bs-cyan: #0db4bd;
+    /* Your Color */
     --bs-white: #ffffff;
     --bs-gray: #434a54;
     --bs-gray-light: #aab2bd;
@@ -9343,17 +9344,19 @@
     --bs-black: #000000;
 
     /* Theme Colors */
-    --bs-primary: #0db4bd; /* Main Brand Color */
+    --bs-primary: #0db4bd;
+    /* Main Brand Color */
     --bs-secondary: #5e2572;
     --bs-success: #00c689;
-    --bs-info: #0db4bd; /* Matches Primary */
+    --bs-info: #0db4bd;
+    /* Matches Primary */
     --bs-warning: #ffc100;
     --bs-danger: #fc7242;
     --bs-light: #f8f9fa;
     --bs-dark: #4f4a60;
 
     /* RGB Values */
-    --bs-primary-rgb: 13, 180, 189;
+    --bs-primary-rgb: 53, 88, 57;
     --bs-secondary-rgb: 94, 37, 114;
     --bs-success-rgb: 0, 198, 137;
     --bs-info-rgb: 13, 180, 189;
@@ -9395,10 +9398,10 @@
     --bs-dark-border-subtle: #adb5bd;
 
     /* Link Colors */
-    --bs-link-color: #0db4bd;
-    --bs-link-color-rgb: 13, 180, 189;
-    --bs-link-hover-color: #0a8d94;
-    --bs-link-hover-color-rgb: 10, 141, 148;
+    --bs-link-color: #355839;
+    --bs-link-color-rgb: 53, 88, 57;
+    --bs-link-hover-color: #355839;
+    --bs-link-hover-color-rgb: #2e4d31;
 
     /* Focus States */
     --bs-focus-ring-color: rgba(13, 180, 189, 0.25);
@@ -13530,54 +13533,46 @@ fieldset:disabled .fc button,
     opacity: var(--bs-btn-disabled-opacity);
 }
 
+
+
 .btn-primary,
 .wizard>.actions a {
     --bs-btn-color: #fff;
-    --bs-btn-bg: #0db4bd;
-    --bs-btn-border-color: #0db4bd;
+    --bs-btn-bg: #355839;
+    --bs-btn-border-color: #355839;
     --bs-btn-hover-color: #fff;
-    --bs-btn-hover-bg: #0b9ca3;
-    --bs-btn-hover-border-color: #0b9ca3;
-    --bs-btn-focus-shadow-rgb: 13, 180, 189;
+    --bs-btn-hover-bg: #2e4d31;
+    /* Darker shade for hover */
+    --bs-btn-hover-border-color: #2e4d31;
+    --bs-btn-focus-shadow-rgb: 53, 88, 57;
+    /* RGB of base */
     --bs-btn-active-color: #fff;
-    --bs-btn-active-bg: #09848a;
-    --bs-btn-active-border-color: #09848a;
+    --bs-btn-active-bg: #274329;
+    /* Even darker for active */
+    --bs-btn-active-border-color: #274329;
     --bs-btn-active-shadow: none;
     --bs-btn-disabled-color: #fff;
-    --bs-btn-disabled-bg: #0db4bd;
-    --bs-btn-disabled-border-color: #0db4bd;
+    --bs-btn-disabled-bg: #355839;
+    --bs-btn-disabled-border-color: #355839;
 }
 
 .btn-secondary,
 .wizard>.actions .disabled a {
-    /* --bs-btn-color: #000;
-    --bs-btn-bg: #d9dbdc;
-    --bs-btn-border-color: #d9dbdc;
-    --bs-btn-hover-color: #000;
-    --bs-btn-hover-bg: #dfe0e1;
-    --bs-btn-hover-border-color: #dddfe0;
-    --bs-btn-focus-shadow-rgb: 184, 186, 187;
-    --bs-btn-active-color: #000;
-    --bs-btn-active-bg: #e1e2e3;
-    --bs-btn-active-border-color: #dddfe0;
+    --bs-btn-color: #fff;
+    --bs-btn-bg: #6f866e;
+    /* Softer tint of #355839 for contrast */
+    --bs-btn-border-color: #6f866e;
+    --bs-btn-hover-color: #fff;
+    --bs-btn-hover-bg: #5e735c;
+    --bs-btn-hover-border-color: #5e735c;
+    --bs-btn-focus-shadow-rgb: 111, 134, 110;
+    --bs-btn-active-color: #fff;
+    --bs-btn-active-bg: #4d604b;
+    --bs-btn-active-border-color: #4d604b;
     --bs-btn-active-shadow: none;
-    --bs-btn-disabled-color: #000;
-    --bs-btn-disabled-bg: #d9dbdc;
-    --bs-btn-disabled-border-color: #d9dbdc; */
-    --bs-btn-color: #000;
-    --bs-btn-bg: #d9dbdc;
-    --bs-btn-border-color: #d9dbdc;
-    --bs-btn-hover-color: #000;
-    --bs-btn-hover-bg: #dfe0e1;
-    --bs-btn-hover-border-color: #dddfe0;
-    --bs-btn-focus-shadow-rgb: 184, 186, 187;
-    --bs-btn-active-color: #000;
-    --bs-btn-active-bg: #e1e2e3;
-    --bs-btn-active-border-color: #dddfe0;
-    --bs-btn-active-shadow: none;
-    --bs-btn-disabled-color: #000;
-    --bs-btn-disabled-bg: #d9dbdc;
-    --bs-btn-disabled-border-color: #d9dbdc;
+    --bs-btn-disabled-color: #fff;
+    --bs-btn-disabled-bg: #6f866e;
+    --bs-btn-disabled-border-color: #6f866e;
 }
 
 .btn-success {
@@ -13683,24 +13678,27 @@ fieldset:disabled .fc button,
 }
 
 .btn-outline-primary {
-
-   /* Button variables */
---bs-btn-color: #0db4bd;
---bs-btn-border-color: #0db4bd;
---bs-btn-hover-color: #fff;
---bs-btn-hover-bg: #0a8d94;  /* 15% darker than primary */
---bs-btn-hover-border-color: #0a8d94;
---bs-btn-focus-shadow-rgb: 13, 180, 189;  /* Your color RGB */
---bs-btn-active-color: #fff;
---bs-btn-active-bg: #086a72;  /* 30% darker than primary */
---bs-btn-active-border-color: #086a72;
---bs-btn-active-shadow: none;
---bs-btn-disabled-color: rgba(13, 180, 189, 0.5);  /* 50% opacity */
---bs-btn-disabled-bg: transparent;
---bs-btn-disabled-border-color: rgba(13, 180, 189, 0.5);
---bs-gradient: none;
-
+    /* Button variables */
+    --bs-btn-color: #355839;
+    --bs-btn-border-color: #355839;
+    --bs-btn-hover-color: #fff;
+    --bs-btn-hover-bg: #2e4d31;
+    /* ~15% darker than #355839 */
+    --bs-btn-hover-border-color: #2e4d31;
+    --bs-btn-focus-shadow-rgb: 53, 88, 57;
+    /* RGB of #355839 */
+    --bs-btn-active-color: #fff;
+    --bs-btn-active-bg: #274329;
+    /* ~30% darker */
+    --bs-btn-active-border-color: #274329;
+    --bs-btn-active-shadow: none;
+    --bs-btn-disabled-color: rgba(53, 88, 57, 0.5);
+    /* 50% opacity */
+    --bs-btn-disabled-bg: transparent;
+    --bs-btn-disabled-border-color: rgba(53, 88, 57, 0.5);
+    --bs-gradient: none;
 }
+
 
 .btn-outline-secondary,
 .editable-container.editable-inline .editableform .control-group .editable-buttons .editable-cancel {
@@ -26409,7 +26407,7 @@ code {
 
 .btn-github:hover,
 .btn-github:focus {
-    background: #09848a;
+    background: #355839;
     color: #ffffff;
 }
 
@@ -28724,7 +28722,7 @@ select.form-select.border-dark:focus {
     height: 100%;
     border-radius: 100%;
     border: 10px solid transparent;
-    border-top-color: #0db4bd;
+    border-top-color: #355839;
 }
 
 .circle-loader:before {
@@ -29304,8 +29302,8 @@ dl li {
 .jsgrid .jsgrid-pager .jsgrid-pager-nav-button:active a,
 .jsgrid .jsgrid-pager .jsgrid-pager-page:active .page-link,
 .jsgrid .jsgrid-pager .jsgrid-pager-page:active a {
-    background: #5e2572;
-    border-color: #5e2572;
+    background: #355839;
+    border-color: #355839;
 }
 
 .pagination.pagination-flat .page-item,
@@ -34595,7 +34593,7 @@ div.tagsinput span.tag {
 }
 
 .sidebar .nav .nav-item.active>.nav-link {
-    background: #09848a;
+    background: #355839;
     position: relative;
 }
 
@@ -34623,7 +34621,7 @@ div.tagsinput span.tag {
 }
 
 .sidebar .nav:not(.sub-menu)>.nav-item:hover>.nav-link {
-    background: #09848a;
+    background: #355839;
 }
 
 .sidebar .nav:not(.sub-menu)>.nav-item:hover>.nav-link .menu-title,
@@ -37286,7 +37284,7 @@ div.tagsinput span.tag {
         display: flex;
         -webkit-align-items: center;
         align-items: center;
-        background: #512063;
+        background: #355839;
         padding: 0.5rem 1.4rem;
         left: 65px;
         position: absolute;
@@ -37319,18 +37317,18 @@ div.tagsinput span.tag {
     }
 
     .sidebar-icon-only .sidebar .nav .nav-item.hover-open .nav-link:hover .menu-title {
-        background: #09848a;
+        background: #355839;
     }
 
     .sidebar-light.sidebar-icon-only .sidebar .nav .nav-item.hover-open .nav-link:hover .menu-title {
-        background: #09848a;
+        background: #355839;
     }
 
     .sidebar-icon-only .sidebar .nav .nav-item.hover-open .collapse,
     .sidebar-icon-only .sidebar .nav .nav-item.hover-open .collapsing {
         display: block;
         padding: 0.5rem 0;
-        background: #09848a;
+        background: #355839;
         border-radius: 0 0 5px 0;
         position: absolute;
         left: 65px;
@@ -37340,7 +37338,7 @@ div.tagsinput span.tag {
 
     .sidebar-light.sidebar-icon-only .sidebar .nav .nav-item.hover-open .collapse,
     .sidebar-light.sidebar-icon-only .sidebar .nav .nav-item.hover-open .collapsing {
-        background: #09848a;
+        background: #355839;
     }
 
     .rtl.sidebar-icon-only .sidebar .nav .nav-item.hover-open .collapse,

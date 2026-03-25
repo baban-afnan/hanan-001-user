@@ -1,5 +1,5 @@
 <x-app-layout>
-    <title>Biometric id - Educational Pin Receipt</title>
+    <title>Hanan Verify - Educational Pin Receipt</title>
 
     <div class="page-body">
         <div class="container-fluid">
