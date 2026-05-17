@@ -1,5 +1,64 @@
 <x-app-layout>
-      <title>Hanan Verify - Services Management</title>
+@section('title', 'Hanan Verify - Services Management')
+
+@push('styles')
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
+    <style>
+        :root {
+            --primary-gradient: linear-gradient(135deg, #0db4bd 0%, #09848a 100%);
+            --success-gradient: linear-gradient(135deg, #22c55e 0%, #10b981 100%);
+            --info-gradient: linear-gradient(135deg, #3b82f6 0%, #0ea5e9 100%);
+            --warning-gradient: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+            --danger-gradient: linear-gradient(135deg, #ef4444 0%, #f43f5e 100%);
+        }
+
+        /* Financial Cards */
+        .financial-card {
+            position: relative;
+            overflow: hidden;
+            border: none;
+            border-radius: 1rem;
+            color: white;
+        }
+        .financial-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            right: 0;
+            width: 150px;
+            height: 150px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 50%;
+            transform: translate(30%, -30%);
+        }
+        .financial-card::after {
+            content: '';
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            width: 100px;
+            height: 100px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 50%;
+            transform: translate(-30%, 30%);
+        }
+
+        /* Stats Typography */
+        .stats-label { font-size: 0.875rem; font-weight: 500; opacity: 0.9; }
+        .stats-value { font-size: 1.5rem; font-weight: 700; letter-spacing: -0.025em; }
+
+        /* Animation */
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .fade-in-up {
+            animation: fadeIn 0.5s ease-out forwards;
+        }
+
+        .avatar-lg { width: 3rem; height: 3rem; display: flex; align-items: center; justify-content: center; }
+    </style>
+@endpush
 
     <div class="content">
         <!-- Page Header -->
@@ -228,7 +287,7 @@
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="8" class="text-center py-5 text-muted">
+                            <td colspan="7" class="text-center py-5 text-muted">
                                 <div class="d-flex flex-column align-items-center">
                                     <i class="ti ti-server-off fs-1 mb-2 opacity-50"></i>
                                     <p class="mb-0">No services found. Create one to get started.</p>
@@ -355,7 +414,7 @@
                 const image = this.dataset.image;
                 const isActive = this.dataset.isActive === '1' || this.dataset.isActive === 'true';
 
-                form.action = `/admin/services/${id}`;
+                form.action = `{{ url('admin/services') }}/${id}`;
                 nameInput.value = name;
                 descInput.value = description || '';
                 statusInput.checked = isActive;
@@ -371,66 +430,7 @@
     });
     </script>
 
-        <style>
-            :root {
-                --primary-gradient: linear-gradient(135deg, #0db4bd 0%, #09848a 100%);
-                --success-gradient: linear-gradient(135deg, #22c55e 0%, #10b981 100%);
-                --info-gradient: linear-gradient(135deg, #3b82f6 0%, #0ea5e9 100%);
-                --warning-gradient: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
-                --danger-gradient: linear-gradient(135deg, #ef4444 0%, #f43f5e 100%);
-            }
-
-            /* Financial Cards */
-            .financial-card {
-                position: relative;
-                overflow: hidden;
-                border: none;
-                border-radius: 1rem;
-                color: white;
-            }
-            .financial-card::before {
-                content: '';
-                position: absolute;
-                top: 0;
-                right: 0;
-                width: 150px;
-                height: 150px;
-                background: rgba(255, 255, 255, 0.1);
-                border-radius: 50%;
-                transform: translate(30%, -30%);
-            }
-            .financial-card::after {
-                content: '';
-                position: absolute;
-                bottom: 0;
-                left: 0;
-                width: 100px;
-                height: 100px;
-                background: rgba(255, 255, 255, 0.1);
-                border-radius: 50%;
-                transform: translate(-30%, 30%);
-            }
-            
-            /* Stats Typography */
-            .stats-label { font-size: 0.875rem; font-weight: 500; opacity: 0.9; }
-            .stats-value { font-size: 1.5rem; font-weight: 700; letter-spacing: -0.025em; }
-
-            /* Animation */
-            @keyframes fadeIn {
-                from { opacity: 0; transform: translateY(10px); }
-                to { opacity: 1; transform: translateY(0); }
-            }
-            .fade-in-up {
-                animation: fadeIn 0.5s ease-out forwards;
-            }
-            
-            .avatar-lg { width: 3rem; height: 3rem; display: flex; align-items: center; justify-content: center; }
-        </style>
-
-    <!-- Tabler Icons -->
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
-    
-    {{-- SweetAlert CDN --}}
+    {{-- Styles moved to @push('styles') at top of file --}}
 
 
     <script>

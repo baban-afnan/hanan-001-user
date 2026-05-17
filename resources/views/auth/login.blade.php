@@ -58,6 +58,7 @@
                                 <label class="form-check-label text-muted">
                                     <input type="checkbox" class="form-check-input" id="remember" name="remember"
                                         {{ old('remember') ? 'checked' : '' }}>
+                                    <i class="input-helper"></i>
                                     Keep me signed in
                                 </label>
                             </div>

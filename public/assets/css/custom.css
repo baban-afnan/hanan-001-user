@@ -68,3 +68,12 @@
     text-transform: uppercase;
     animation: fadeIn 1.5s ease-in-out infinite alternate;
 }
+
+/* Fix Bootstrap 5 switches getting shifted left due to CalmUI .form-check overrides */
+.form-check.form-switch {
+    padding-left: 2.5em !important;
+}
+
+.form-check.form-switch .form-check-input {
+    margin-left: -2.5em !important;
+}

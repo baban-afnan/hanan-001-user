@@ -86,6 +86,7 @@
                                 <label class="form-check-label text-muted">
                                     <input type="checkbox" name="terms" id="terms" value="1"
                                         class="form-check-input @error('terms') is-invalid @enderror" {{ old('terms') ? 'checked' : '' }}>
+                                    <i class="input-helper"></i>
                                     I agree to all <a href="#" class="text-primary text-decoration-none fw-bold">Terms & Conditions</a>
                                 </label>
                             </div>
