@@ -163,25 +163,26 @@ class NINPhoneVerificationController extends Controller
                     'user_id' => $user->id,
                     'response' => $data
                 ]);
-                
-                return back()->with([
-                    'status' => 'warning',
-                    'message' => $errorMessage . ' This is a temporary issue with the verification service provider.'
+                $errorMessage .= ' (Temporary issue with service provider)';
+            } else {
+                // Log API errors for debugging
+                \Log::error('NIN Phone Verification API Error', [
+                    'phone' => $request->phone_number,
+                    'user_id' => $user->id,
+                    'status_code' => $response->status(),
+                    'response' => $data
                 ]);
             }
 
-            // Log API errors for debugging
-            \Log::error('NIN Phone Verification API Error', [
-                'phone' => $request->phone_number,
-                'user_id' => $user->id,
-                'status_code' => $response->status(),
-                'response' => $data
-            ]);
-
-            return back()->with([
-                'status' => 'error',
-                'message' => $errorMessage
-            ]);
+            return $this->processFailedTransaction(
+                $wallet,
+                $servicePrice,
+                $user,
+                $serviceField,
+                $service,
+                $request->phone_number,
+                $errorMessage
+            );
 
         } catch (\Illuminate\Http\Client\ConnectionException $e) {
             \Log::error('NIN Phone Verification Connection Error', [
@@ -190,10 +191,15 @@ class NINPhoneVerificationController extends Controller
                 'error' => $e->getMessage()
             ]);
             
-            return back()->with([
-                'status' => 'error',
-                'message' => 'Unable to connect to verification service. Please check your internet connection and try again.'
-            ]);
+            return $this->processFailedTransaction(
+                $wallet,
+                $servicePrice,
+                $user,
+                $serviceField,
+                $service,
+                $request->phone_number,
+                'Unable to connect to verification service. Request timed out.'
+            );
         } catch (\Illuminate\Http\Client\RequestException $e) {
             \Log::error('NIN Phone Verification Request Error', [
                 'phone' => $request->phone_number ?? 'N/A',
@@ -201,10 +207,15 @@ class NINPhoneVerificationController extends Controller
                 'error' => $e->getMessage()
             ]);
             
-            return back()->with([
-                'status' => 'error',
-                'message' => 'Verification request failed. Please try again later.'
-            ]);
+            return $this->processFailedTransaction(
+                $wallet,
+                $servicePrice,
+                $user,
+                $serviceField,
+                $service,
+                $request->phone_number,
+                'Verification request failed.'
+            );
         } catch (\Exception $e) {
             \Log::error('NIN Phone Verification System Error', [
                 'phone' => $request->phone_number ?? 'N/A',
@@ -213,9 +224,71 @@ class NINPhoneVerificationController extends Controller
                 'trace' => $e->getTraceAsString()
             ]);
             
+            return $this->processFailedTransaction(
+                $wallet,
+                $servicePrice,
+                $user,
+                $serviceField,
+                $service,
+                $request->phone_number,
+                'System error occurred during verification.'
+            );
+        }
+    }
+
+    /**
+     * Process failed transaction (Charge + Failed Verification Record)
+     */
+    private function processFailedTransaction($wallet, $servicePrice, $user, $serviceField, $service, $phoneNumber, $errorMessage)
+    {
+        DB::beginTransaction();
+
+        try {
+            $transactionRef = 'P2' . (time() % 1000000000) . '-' . mt_rand(100, 999);
+            $performedBy = $user->first_name . ' ' . $user->last_name;
+
+            $transaction = Transaction::create([
+                'referenceId' => $transactionRef,
+                'user_id' => $user->id,
+                'amount' => $servicePrice,
+                'service_type'    => 'nin phone verification',
+                'service_description' => "NIN Phone Verification - {$serviceField->field_name} (Failed)",
+                'type' => 'debit',
+                'status' => 'Approved',
+            ]);
+
+            // Deduct wallet balance
+            $wallet->decrement('balance', $servicePrice);
+
+            Verification::create([
+                'user_id' => $user->id,
+                'service_field_id' => $serviceField->id,
+                'service_id' => $service->id,
+                'transaction_id' => $transaction->id,
+                'reference' => $transactionRef,
+                'field_code' => $serviceField->field_code ?? null,
+                'field_name' => $serviceField->field_name ?? null,
+                'service_name' => $service->service_name ?? null,
+                'service_type' => $service->service_type ?? null,
+                'amount' => $servicePrice,
+                'telephoneno' => $phoneNumber,
+                'performed_by' => $performedBy,
+                'submission_date' => Carbon::now(),
+                'status' => 'failed',
+            ]);
+
+            DB::commit();
+
             return back()->with([
                 'status' => 'error',
-                'message' => 'A system error occurred. Please contact support if this persists.'
+                'message' => "Verification failed: {$errorMessage} Reference: {$transactionRef}. Charged: NGN " . number_format($servicePrice, 2),
+            ]);
+        } catch (\Exception $e) {
+            DB::rollBack();
+            report($e);
+            return back()->with([
+                'status' => 'error',
+                'message' => 'Transaction failed: ' . $e->getMessage()
             ]);
         }
     }
@@ -329,7 +402,7 @@ class NINPhoneVerificationController extends Controller
                 // Transaction Information
                 'performed_by' => $performedBy,
                 'submission_date' => Carbon::now(),
-                'status' => 'pending',
+                'status' => 'successful',
             ]);
 
             DB::commit();
