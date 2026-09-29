@@ -3,7 +3,6 @@
 namespace App\Http\Controllers\Verification;
 
 use App\Http\Controllers\Controller;
-
 use App\Helpers\ServiceManager;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -13,7 +12,6 @@ use Illuminate\Support\Facades\Log;
 use App\Models\Verification;
 use App\Models\Transaction;
 use App\Models\Service;
-use App\Models\Services1;
 use App\Models\ServiceField;
 use App\Models\Wallet;
 use App\Repositories\NIN_PDF_Repository;
@@ -28,8 +26,15 @@ class NINverificationController extends Controller
     {
         $user = auth()->user();
 
-        // Get Verification Service from DB
-        $service = Services1::where('name', 'Verification')->first();
+        // Get Verification Service using ServiceManager
+        $service = ServiceManager::getServiceWithFields('Verification', [
+            ['name' => 'Verify NIN', 'code' => '610', 'price' => 80],
+            ['name' => 'Basic Slip', 'code' => 'V101', 'price' => 50],
+            ['name' => 'Regular Slip', 'code' => 'V102', 'price' => 100],
+            ['name' => 'standard slip', 'code' => '611', 'price' => 100],
+            ['name' => 'preminum slip', 'code' => '612', 'price' => 150],
+            ['name' => '1Vnin slip', 'code' => '616', 'price' => 100],
+        ]);
         
         // Get Prices
         $verificationPrice = 0;
@@ -75,46 +80,20 @@ class NINverificationController extends Controller
     {
         $user = Auth::user();
 
-        $request->validate([
+        $validated = $request->validate([
             'number_nin' => 'required|string|size:11|regex:/^[0-9]{11}$/',
         ]);
 
-        // Check for duplicate in last 10 minutes (to prevent double charging)
-        $recentVerification = Verification::where('user_id', $user->id)
-            ->where('number_nin', $request->number_nin)
-            ->where('submission_date', '>=', Carbon::now()->subMinutes(10))
-            ->latest()
-            ->first();
-
-        if ($recentVerification) {
-            // Reconstruct the response data for the Blade view
-            $reconstructedData = [
-                'status' => 'success',
-                'data' => [
-                    'nin' => $recentVerification->number_nin,
-                    'firstName' => $recentVerification->firstname,
-                    'middleName' => $recentVerification->middlename,
-                    'surname' => $recentVerification->surname,
-                    'birthDate' => $recentVerification->birthdate,
-                    'gender' => $recentVerification->gender,
-                    'telephoneNo' => $recentVerification->telephoneno,
-                    'photo' => $recentVerification->photo_path,
-                ]
-            ];
-
-            session()->flash('verification', $reconstructedData);
-
-            return redirect()->route('user.nin.verification.index')->with([
-                'status' => 'success',
-                'message' => "Result retrieved from history (Verified at {$recentVerification->submission_date}). No additional charge.",
-            ]);
-        }
-
-        // 1. Get Verification Service from DB
-        $service = Services1::where('name', 'Verification')->first();
+        // 1. Get Verification Service using ServiceManager
+        $service = ServiceManager::getServiceWithFields('Verification', [
+            ['name' => 'Verify NIN', 'code' => '610', 'price' => 80],
+        ]);
 
         if (!$service) {
-            return back()->with(['status' => 'error', 'message' => 'Verification service not available.']);
+            return back()->with([
+                'status' => 'error',
+                'message' => 'Verification service not available.'
+            ]);
         }
 
         // 2. Get NIN Verification ServiceField (610)
@@ -124,7 +103,10 @@ class NINverificationController extends Controller
             ->first();
 
         if (!$serviceField) {
-            return back()->with(['status' => 'error', 'message' => 'NIN verification service is not available.']);
+            return back()->with([
+                'status' => 'error',
+                'message' => 'NIN verification service is not available.'
+            ]);
         }
 
         // 3. Determine service price based on user role
@@ -132,6 +114,7 @@ class NINverificationController extends Controller
 
         // 4. Check wallet
         $wallet = Wallet::where('user_id', $user->id)->firstOrFail();
+
 
         if ($wallet->balance < $servicePrice) {
             return back()->with([
@@ -141,56 +124,97 @@ class NINverificationController extends Controller
         }
 
         try {
-            $apiKey = env('AREWA_API_TOKEN');
-            $apiBaseUrl = env('AREWA_BASE_URL');
+            $apiKey = config('services.arewa.token') ?? env('AREWA_API_TOKEN');
+            $apiBaseUrl = config('services.arewa.base_url') ?? env('AREWA_BASE_URL', 'https://api.arewasmart.com.ng/api/v1');
             $apiUrl = rtrim($apiBaseUrl, '/') . '/nin/verify';
 
-            $response = Http::timeout(30)->withoutVerifying()
-                ->withToken($apiKey)
+            $response = Http::withToken($apiKey)
                 ->acceptJson()
+                ->withOptions([
+                    'verify' => (bool) config('services.validator.verify_ssl', false),
+                ])
                 ->post($apiUrl, [
                     'nin' => $request->number_nin,
                 ]);
 
+            // Log the raw response for debugging
+            Log::info('NIN Verification Response', [
+                'status' => $response->status(),
+                'response' => $response->json()
+            ]);
+
             $decodedData = $response->json();
 
-            // Log the response for debugging
-            Log::info('NIN Verification Status: ' . $response->status(), [
-                'response' => $decodedData
-            ]);
-
-            // Success is ONLY when HTTP status is 200, API returns success status, and data is present
-            if ($response->status() === 200 && 
-                (isset($decodedData['status']) && $decodedData['status'] === 'success') && 
-                !empty($decodedData['data'])) {
-                
-                // Successful -> Proceed to Charge + Create Records
-                return $this->processSuccessTransaction(
-                    $wallet,
-                    $servicePrice,
-                    $user,
-                    $serviceField,
-                    $service,
-                    $decodedData
-                );
+            // 1. Verification fails if HTTP status code is not 200
+            if ($response->status() !== 200) {
+                return back()->with([
+                    'status' => 'error',
+                    'message' => 'API Error: ' . ($decodedData['message'] ?? ('Verification failed with status code ' . $response->status()))
+                ]);
             }
 
-            // All other responses are unsuccessful
-            $errorMessage = $decodedData['message'] ?? 'Verification failed or invalid response from API.';
+            // 2. Check if status indicates success
+            $status = $decodedData['status'] ?? 'UNKNOWN';
+            $isSuccessStatus = ($status === 'success' || $status === true || $status === 200 || $status === '200');
+
+            // 3. Ensure verification information/data is returned
+            $apiData = [];
+            if (!empty($decodedData['data']) && is_array($decodedData['data'])) {
+                $apiData = isset($decodedData['data']['data']) && is_array($decodedData['data']['data'])
+                    ? $decodedData['data']['data']
+                    : $decodedData['data'];
+            } elseif (!empty($decodedData['api_response']['data']['data']) && is_array($decodedData['api_response']['data']['data'])) {
+                $apiData = $decodedData['api_response']['data']['data'];
+            } elseif (!empty($decodedData['api_response']['data']) && is_array($decodedData['api_response']['data'])) {
+                $apiData = $decodedData['api_response']['data'];
+            }
+
+            if (is_array($apiData) && isset($apiData[0]) && is_array($apiData[0])) {
+                $apiData = $apiData[0];
+            }
+
+            $hasVerificationData = !empty($apiData) && is_array($apiData);
+
+            if (!$isSuccessStatus || !$hasVerificationData) {
+                return back()->with([
+                    'status' => 'error',
+                    'message' => $decodedData['message'] ?? 'Verification failed: No verification data returned from provider.'
+                ]);
+            }
+
+            // Check if NIN is suspended (contains **** in critical fields)
+            $isSuspended = false;
+            $suspendedFields = ['firstname', 'surname', 'nin'];
             
-            if ($response->status() === 400) {
-                $errorMessage = 'NIN do not exist.';
-            } elseif ($response->status() !== 200) {
-                $errorMessage = "API Error (Code {$response->status()}): " . $errorMessage;
+            foreach ($suspendedFields as $field) {
+                $value = $apiData[$field] ?? ($apiData[str_replace('_', '', strtolower($field))] ?? '');
+                if (is_string($value) && (strpos($value, '****') !== false || strpos($value, '*****') !== false || $value === '*')) {
+                    $isSuspended = true;
+                    break;
+                }
             }
-
-            return back()->with([
-                'status' => 'error',
-                'message' => $errorMessage
-            ]);
+            
+            if ($isSuspended) {
+                return back()->with([
+                    'status' => 'error',
+                    'message' => 'This NIN is suspended and cannot be verified. Please contact NIMC for assistance.'
+                ]);
+            }
+            
+            // Successful (HTTP 200 + Success Status + Valid Verification Data) -> Charge + Create Transaction + Create Verification
+            return $this->processSuccessTransaction(
+                $wallet,
+                $servicePrice,
+                $user,
+                $serviceField,
+                $service,
+                $decodedData,
+                $apiData,
+                $request->number_nin
+            );
 
         } catch (\Exception $e) {
-            Log::error('NIN Verification System Error', ['message' => $e->getMessage()]);
+             // System/Network Error -> No Charge + Transaction Log if possible (optional, but good for tracking)
             return back()->with([
                 'status' => 'error',
                 'message' => 'System Error: ' . $e->getMessage()
@@ -201,7 +225,7 @@ class NINverificationController extends Controller
     /**
      * Process successful transaction (Charge + Verification Record)
      */
-    private function processSuccessTransaction($wallet, $servicePrice, $user, $serviceField, $service, $ninData)
+    private function processSuccessTransaction($wallet, $servicePrice, $user, $serviceField, $service, $decodedData, $apiData, $inputNin)
     {
         DB::beginTransaction();
 
@@ -209,58 +233,180 @@ class NINverificationController extends Controller
             $transactionRef = 'Ver-' . (time() % 1000000000) . '-' . mt_rand(100, 999);
             $performedBy = $user->first_name . ' ' . $user->last_name;
 
+            // Normalize core fields
+            $nin = $apiData['nin'] ?? ($apiData['number_nin'] ?? $inputNin);
+            $firstname = $apiData['firstname'] ?? ($apiData['firstName'] ?? ($apiData['first_name'] ?? ''));
+            $middlename = $apiData['middlename'] ?? ($apiData['middleName'] ?? ($apiData['middle_name'] ?? ''));
+            $surname = $apiData['surname'] ?? ($apiData['lastName'] ?? ($apiData['last_name'] ?? ''));
+            $birthdate = $apiData['birthdate'] ?? ($apiData['birthDate'] ?? ($apiData['dob'] ?? ($apiData['birthday'] ?? '')));
+
+            $rawGender = strtolower(trim($apiData['gender'] ?? ''));
+            if ($rawGender === 'm' || $rawGender === 'male') {
+                $gender = 'Male';
+            } elseif ($rawGender === 'f' || $rawGender === 'female') {
+                $gender = 'Female';
+            } else {
+                $gender = $apiData['gender'] ?? '';
+            }
+
+            $telephoneno = $apiData['telephoneno'] ?? ($apiData['telephoneNo'] ?? ($apiData['phone'] ?? ($apiData['phoneNumber'] ?? '')));
+            
+            // Clean photo and signature base64 prefix
+            $rawPhoto = $apiData['photo'] ?? ($apiData['photo_path'] ?? '');
+            $photo = preg_replace('/^data:image\/[a-zA-Z]+;base64,/', '', $rawPhoto);
+
+            $rawSignature = $apiData['signature'] ?? ($apiData['signature_path'] ?? '');
+            $signature = preg_replace('/^data:image\/[a-zA-Z]+;base64,/', '', $rawSignature);
+
+            $trackingId = $apiData['trackingId'] ?? ($apiData['tracking_id'] ?? '');
+
+            $residenceAddress = $apiData['residence_AdressLine1'] ?? ($apiData['residence_address'] ?? ($apiData['address'] ?? ''));
+            $residenceState = $apiData['residence_state'] ?? ($apiData['residenceState'] ?? '');
+            $residenceLga = $apiData['residence_lga'] ?? ($apiData['residenceLga'] ?? '');
+            $residenceTown = $apiData['residence_Town'] ?? ($apiData['residence_town'] ?? ($apiData['residenceTown'] ?? ''));
+
+            $birthState = $apiData['birthstate'] ?? ($apiData['birthState'] ?? '');
+            $birthLga = $apiData['birthlga'] ?? ($apiData['birthLga'] ?? '');
+            $birthCountry = $apiData['birthcountry'] ?? ($apiData['birthCountry'] ?? '');
+
+            $maritalStatus = $apiData['maritalstatus'] ?? ($apiData['maritalStatus'] ?? '');
+            $email = $apiData['email'] ?? '';
+            $religion = $apiData['religion'] ?? '';
+            $employmentStatus = $apiData['emplymentstatus'] ?? ($apiData['employmentstatus'] ?? ($apiData['employmentStatus'] ?? ''));
+            $educationalLevel = $apiData['educationallevel'] ?? ($apiData['educationalLevel'] ?? '');
+            $profession = $apiData['profession'] ?? '';
+            $height = $apiData['heigth'] ?? ($apiData['height'] ?? '');
+            $title = $apiData['title'] ?? '';
+            $centralID = $apiData['centralID'] ?? ($apiData['userid'] ?? '');
+
+            // Next of Kin
+            $nokFirstname = $apiData['nok_firstname'] ?? '';
+            $nokMiddlename = $apiData['nok_middlename'] ?? '';
+            $nokSurname = $apiData['nok_surname'] ?? '';
+            $nokAddress1 = $apiData['nok_address1'] ?? '';
+            $nokAddress2 = $apiData['nok_address2'] ?? '';
+            $nokLga = $apiData['nok_lga'] ?? '';
+            $nokState = $apiData['nok_state'] ?? '';
+            $nokTown = $apiData['nok_town'] ?? '';
+            $nokPostalcode = $apiData['nok_postalcode'] ?? '';
+
+            // Self Origin
+            $selfOriginState = $apiData['self_origin_state'] ?? '';
+            $selfOriginLga = $apiData['self_origin_lga'] ?? '';
+            $selfOriginPlace = $apiData['self_origin_place'] ?? '';
+
             $transaction = Transaction::create([
                 'referenceId' => $transactionRef,
                 'user_id' => $user->id,
                 'amount' => $servicePrice,
-                'service_type'    => 'NIN Verification',
+                'service_type' => 'NIN Verification',
                 'service_description' => "NIN Verification - {$serviceField->field_name}",
                 'type' => 'debit',
                 'status' => 'Approved',
-                'performed_by'    => $performedBy,
-                'metadata' => [
-                    'service' => 'verification',
-                    'service_field' => $serviceField->field_name,
-                    'field_code' => $serviceField->field_code,
-                    'nin' => $ninData['data']['nin'] ?? 'N/A', // Should exist on success
-                    'user_role' => $user->role,
-                    'price_details' => [
-                        'base_price' => $serviceField->base_price,
-                        'user_price' => $servicePrice,
-                    ],
-                    'source' => 'API',
-                    'api_response' => $ninData
-                ],
             ]);
 
             // Deduct wallet balance
             $wallet->decrement('balance', $servicePrice);
 
-            $apiData = $ninData['data'] ?? [];
-
             Verification::create([
+                'reference' => $transactionRef,
                 'user_id' => $user->id,
                 'service_field_id' => $serviceField->id,
                 'service_id' => $service->id,
                 'transaction_id' => $transaction->id,
-                'reference' => $transactionRef,
-                'idno' => $apiData['nin'] ?? ($apiData['number_nin'] ?? ''),
-                'number_nin' => $apiData['nin'] ?? ($apiData['number_nin'] ?? ''),
-                'firstname' => $apiData['firstName'] ?? ($apiData['first_name'] ?? ''),
-                'middlename' => $apiData['middleName'] ?? ($apiData['middle_name'] ?? ''),
-                'surname' => $apiData['surname'] ?? ($apiData['last_name'] ?? ''),
-                'birthdate' =>  $apiData['birthDate'] ?? ($apiData['dob'] ?? ($apiData['birthday'] ?? '')),
-                'gender' => $apiData['gender'] ?? '',
-                'telephoneno' => $apiData['telephoneNo'] ?? ($apiData['phone'] ?? ($apiData['phoneNumber'] ?? '')),
-                'photo_path' => $apiData['photo'] ?? '',
+                'field_code' => $serviceField->field_code ?? '610',
+                'field_name' => $serviceField->field_name ?? 'Verify NIN',
+                'service_name' => $service->service_name ?? 'Verification',
+                'service_type' => $service->service_type ?? 'Verification',
+                'description' => "NIN Verification - {$serviceField->field_name}",
+                'amount' => $servicePrice,
+                'status' => 'successful',
+
+                // Personal Information
+                'firstname' => $firstname,
+                'middlename' => $middlename,
+                'surname' => $surname,
+                'gender' => $gender,
+                'birthdate' => $birthdate,
+                'birthstate' => $birthState,
+                'birthlga' => $birthLga,
+                'birthcountry' => $birthCountry,
+                'maritalstatus' => $maritalStatus,
+                'email' => $email,
+                'telephoneno' => $telephoneno,
+
+                // Residence Information
+                'residence_address' => $residenceAddress,
+                'residence_state' => $residenceState,
+                'residence_lga' => $residenceLga,
+                'residence_town' => $residenceTown,
+
+                // Additional Information
+                'religion' => $religion,
+                'employmentstatus' => $employmentStatus,
+                'educationallevel' => $educationalLevel,
+                'profession' => $profession,
+                'height' => $height,
+                'title' => $title,
+
+                // Identifiers
+                'nin' => $nin,
+                'number_nin' => $nin,
+                'idno' => $nin,
+                'vnin' => $apiData['vnin'] ?? null,
+                'userid' => $centralID,
+                'photo_path' => $photo,
+                'signature_path' => $signature,
+                'trackingId' => $trackingId,
+
+                // Next of Kin
+                'nok_firstname' => $nokFirstname,
+                'nok_middlename' => $nokMiddlename,
+                'nok_surname' => $nokSurname,
+                'nok_address1' => $nokAddress1,
+                'nok_address2' => $nokAddress2,
+                'nok_lga' => $nokLga,
+                'nok_state' => $nokState,
+                'nok_town' => $nokTown,
+                'nok_postalcode' => $nokPostalcode,
+
+                // Self Origin
+                'self_origin_state' => $selfOriginState,
+                'self_origin_lga' => $selfOriginLga,
+                'self_origin_place' => $selfOriginPlace,
+
                 'performed_by'    => $performedBy,
-                'submission_date' => Carbon::now()
+                'submission_date' => Carbon::now(),
+                'response_data' => $decodedData,
             ]);
 
             DB::commit();
 
-            // Flash normalized verification data for Blade
-            session()->flash('verification', $ninData);
+            // Flash normalized verification data for Blade (supporting both camelCase and lowercase)
+            session()->flash('verification', [
+                'status' => true,
+                'message' => 'NIN Verification Successful',
+                'data' => [
+                    'nin' => $nin,
+                    'number_nin' => $nin,
+                    'firstName' => $firstname,
+                    'firstname' => $firstname,
+                    'surname' => $surname,
+                    'lastName' => $surname,
+                    'middleName' => $middlename,
+                    'middlename' => $middlename,
+                    'birthDate' => $birthdate,
+                    'birthdate' => $birthdate,
+                    'gender' => $gender,
+                    'telephoneNo' => $telephoneno,
+                    'telephoneno' => $telephoneno,
+                    'photo' => $photo,
+                    'residence_address' => $residenceAddress,
+                    'residence_state' => $residenceState,
+                    'residence_lga' => $residenceLga,
+                    'trackingId' => $trackingId,
+                ]
+            ]);
 
             return redirect()->route('user.nin.verification.index')->with([
                 'status' => 'success',
@@ -275,13 +421,21 @@ class NINverificationController extends Controller
             ]);
         }
     }
+
+
     /**
      * Charge for Slip Download
      */
     private function chargeForSlip($user, $fieldCode)
     {
-         // 1. Get Verification Service from DB
-         $service = Services1::where('name', 'Verification')->first();
+         // 1. Get Verification Service using ServiceManager
+         $service = ServiceManager::getServiceWithFields('Verification', [
+            ['name' => 'Basic Slip', 'code' => 'V101', 'price' => 50],
+            ['name' => 'Regular Slip', 'code' => 'V102', 'price' => 100],
+            ['name' => 'standard slip', 'code' => '611', 'price' => 100],
+            ['name' => 'preminum slip', 'code' => '612', 'price' => 150],
+            ['name' => '1Vnin slip', 'code' => '616', 'price' => 100],
+        ]);
 
         if (!$service) {
             throw new \Exception('Verification service not available.');
@@ -303,26 +457,39 @@ class NINverificationController extends Controller
         // 4. Check wallet
         $wallet = Wallet::where('user_id', $user->id)->firstOrFail();
 
+        if ($wallet->status !== 'active') {
+             throw new \Exception('Your wallet is not active.');
+        }
+
         if ($wallet->balance < $servicePrice) {
              throw new \Exception('Insufficient wallet balance.');
         }
         
-        $transactionRef = 'Slip-' . (time() % 1000000000) . '-' . mt_rand(100, 999);
+        DB::beginTransaction();
+        try {
+             $transactionRef = 'Slip-' . (time() % 1000000000) . '-' . mt_rand(100, 999);
+             $performedBy = $user->first_name . ' ' . $user->last_name;
+ 
+             Transaction::create([
+                 'referenceId' => $transactionRef,
+                 'user_id' => $user->id,
+                 'amount' => $servicePrice,
+                 'service_type' => 'Slip Download',
+                 'service_description' => "Slip Download: {$serviceField->field_name}",
+                 'type' => 'debit',
+                 'status' => 'Approved',
+             ]);
+ 
+             // Deduct wallet balance
+             $wallet->decrement('balance', $servicePrice);
+             
+             DB::commit();
+             return true;
 
-        Transaction::create([
-            'referenceId' => $transactionRef,
-            'user_id' => $user->id,
-            'amount' => $servicePrice,
-            'service_type' => 'Slip Download',
-            'service_description' => "Slip Download - {$serviceField->field_name}",
-            'type' => 'debit',
-            'status' => 'Approved',
-        ]);
-
-         // Deduct wallet balance
-         $wallet->decrement('balance', $servicePrice);
-         
-         return true;
+        } catch (\Exception $e) {
+            DB::rollBack();
+            throw $e;
+        }
     }
 
     /**
@@ -330,86 +497,77 @@ class NINverificationController extends Controller
      */
     public function basicSlip($nin_no)
     {
-        DB::beginTransaction();
         try {
             $this->chargeForSlip(Auth::user(), 'V101'); // Charge for Basic Slip
             
             $repObj = new NIN_PDF_Repository();
-            $pdf = $repObj->basicPDF($nin_no);
-            
-            DB::commit();
-            return $pdf;
+            return $repObj->basicPDF($nin_no);
         } catch (\Exception $e) {
-            DB::rollBack();
             return back()->with('error', $e->getMessage());
         }
     }
 
     public function regularSlip($nin_no)
     {
-        DB::beginTransaction();
         try {
             $this->chargeForSlip(Auth::user(), 'V102'); // Charge for Regular Slip
             
             $repObj = new NIN_PDF_Repository();
-            $pdf = $repObj->regularPDF($nin_no);
-            
-            DB::commit();
-            return $pdf;
+            return $repObj->regularPDF($nin_no);
         } catch (\Exception $e) {
-            DB::rollBack();
             return back()->with('error', $e->getMessage());
         }
     }
 
     public function standardSlip($nin_no)
     {
-        DB::beginTransaction();
         try {
             $this->chargeForSlip(Auth::user(), '611'); // Charge for Standard Slip
             
             $repObj = new NIN_PDF_Repository();
-            $pdf = $repObj->standardPDF($nin_no);
-            
-            DB::commit();
-            return $pdf;
+            return $repObj->standardPDF($nin_no);
         } catch (\Exception $e) {
-            DB::rollBack();
             return back()->with('error', $e->getMessage());
         }
     }
 
     public function premiumSlip($nin_no)
     {
-        DB::beginTransaction();
         try {
             $this->chargeForSlip(Auth::user(), '612'); // Charge for Premium Slip
             
             $repObj = new NIN_PDF_Repository();
-            $pdf = $repObj->premiumPDF($nin_no);
-            
-            DB::commit();
-            return $pdf;
+            return $repObj->premiumPDF($nin_no);
         } catch (\Exception $e) {
-            DB::rollBack();
             return back()->with('error', $e->getMessage());
         }
     }
 
     public function vninSlip($nin_no)
     {
-        DB::beginTransaction();
         try {
             $this->chargeForSlip(Auth::user(), '616'); // Charge for VNIN Slip
             
             $repObj = new NIN_PDF_Repository();
-            $pdf = $repObj->vninPDF($nin_no);
-            
-            DB::commit();
-            return $pdf;
+            return $repObj->vninPDF($nin_no);
         } catch (\Exception $e) {
-            DB::rollBack();
             return back()->with('error', $e->getMessage());
         }
+    }
+
+    /**
+     * Update verification status (for route nin.verification.status)
+     */
+    public function updateStatus(Request $request, $id)
+    {
+        $verification = Verification::where('id', $id)
+            ->where('user_id', Auth::id())
+            ->firstOrFail();
+
+        $verification->update([
+            'status' => $request->input('status', $verification->status),
+        ]);
+
+        return response()->json(['success' => true, 'message' => 'Status updated successfully.']);
     }
 }
