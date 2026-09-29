@@ -338,6 +338,9 @@ class TinRegistrationController extends Controller
             ->first();
 
         if (!$agentService) {
+            if (request()->expectsJson() || request()->ajax() || request()->header('X-Requested-With') === 'XMLHttpRequest') {
+                return response()->json(['message' => 'Validation record not found or invalid.'], 404);
+            }
             return back()->with([
                 'status' => 'error',
                 'message' => 'Validation record not found or invalid.'
@@ -351,6 +354,9 @@ class TinRegistrationController extends Controller
             ->first();
 
         if (!$serviceField) {
+            if (request()->expectsJson() || request()->ajax() || request()->header('X-Requested-With') === 'XMLHttpRequest') {
+                return response()->json(['message' => "Download service (Code: $fieldCode) not available."], 422);
+            }
             return back()->with([
                 'status' => 'error',
                 'message' => "Download service (Code: $fieldCode) not available."
@@ -360,6 +366,9 @@ class TinRegistrationController extends Controller
         $price = $serviceField->getPriceForUserType($user->role);
 
         if ($price === null) {
+            if (request()->expectsJson() || request()->ajax() || request()->header('X-Requested-With') === 'XMLHttpRequest') {
+                return response()->json(['message' => 'Download price not configured for your role.'], 422);
+            }
             return back()->with([
                 'status' => 'error',
                 'message' => 'Download price not configured for your role.'
@@ -370,9 +379,13 @@ class TinRegistrationController extends Controller
         $wallet = Wallet::where('user_id', $user->id)->firstOrFail();
 
         if ($wallet->balance < $price) {
+            $msg = 'Insufficient funds. You need NGN ' . number_format($price - $wallet->balance, 2) . ' more to download.';
+            if (request()->expectsJson() || request()->ajax() || request()->header('X-Requested-With') === 'XMLHttpRequest') {
+                return response()->json(['message' => $msg], 422);
+            }
             return back()->with([
                 'status' => 'error',
-                'message' => 'Insufficient funds. You need NGN ' . number_format($price - $wallet->balance, 2) . ' more to download.'
+                'message' => $msg
             ]);
         }
 
@@ -402,13 +415,13 @@ class TinRegistrationController extends Controller
             // Deduct Wallet
             $wallet->decrement('balance', $price);
 
-            DB::commit();
-
             // 4. Generate PDF
             if ($type === 'individual') {
                 // Use NIN_PDF_Repository for Individual Slip
                 $ninRepository = new \App\Repositories\NIN_PDF_Repository();
-                return $ninRepository->individualSlip($agentService, $reference);
+                $pdfResponse = $ninRepository->individualSlip($agentService, $reference);
+                DB::commit();
+                return $pdfResponse;
 
             } else {
                 // Corporate Certificate
@@ -441,12 +454,18 @@ class TinRegistrationController extends Controller
                     'qrcode' => $qrcode
                 ])->setPaper('a4', 'landscape');
 
-                return $pdf->download('TIN_Certificate_' . $reference . '.pdf');
+                $pdfResponse = $pdf->download('TIN_Certificate_' . $reference . '.pdf');
+                DB::commit();
+                return $pdfResponse;
             }
 
         } catch (\Exception $e) {
             DB::rollBack();
             Log::error('TIN Download Logic Error', ['error' => $e->getMessage()]);
+
+            if (request()->expectsJson() || request()->ajax() || request()->header('X-Requested-With') === 'XMLHttpRequest') {
+                return response()->json(['message' => 'System error during charge process: ' . $e->getMessage()], 422);
+            }
 
             return back()->with([
                 'status' => 'error',

@@ -386,7 +386,7 @@
                 }
             });
 
-            // SweetAlert Download Confirmation
+            // SweetAlert Download Confirmation without page refresh
             window.handleDownload = function(e, form) {
                 e.preventDefault();
                 
@@ -403,10 +403,101 @@
                     confirmButtonText: 'Yes, Download!',
                     cancelButtonText: 'Cancel'
                 }).then((result) => {
-                    if (result.isConfirmed) {
-                        // Submit the form
-                        form.submit();
-                    }
+                    if (!result.isConfirmed) return;
+
+                    // Show loading modal
+                    Swal.fire({
+                        title: 'Generating TIN Slip...',
+                        text: 'Please wait while we process your request. Do not refresh.',
+                        allowOutsideClick: false,
+                        allowEscapeKey: false,
+                        showConfirmButton: false,
+                        didOpen: () => {
+                            Swal.showLoading();
+                        }
+                    });
+
+                    const formData = new FormData(form);
+
+                    fetch(form.action, {
+                        method: 'POST',
+                        body: formData,
+                        headers: {
+                            'Accept': 'application/pdf, application/json, */*',
+                            'X-Requested-With': 'XMLHttpRequest'
+                        }
+                    })
+                    .then(async (response) => {
+                        const contentType = response.headers.get('content-type') || '';
+
+                        if (!response.ok) {
+                            let errorMsg = `Download failed (HTTP ${response.status})`;
+                            try {
+                                if (contentType.includes('application/json')) {
+                                    const errData = await response.json();
+                                    errorMsg = errData.message || (errData.errors ? Object.values(errData.errors).flat().join('<br>') : errorMsg);
+                                } else {
+                                    const errText = await response.text();
+                                    if (errText && errText.length < 300) errorMsg = errText;
+                                }
+                            } catch (e) {}
+
+                            Swal.fire({
+                                title: 'Download Failed',
+                                html: errorMsg,
+                                icon: 'error',
+                                confirmButtonColor: '#3085d6'
+                            });
+                            return;
+                        }
+
+                        if (contentType.includes('application/json')) {
+                            const jsonData = await response.json();
+                            Swal.fire('Notice', jsonData.message || 'Download processed.', 'info');
+                            return;
+                        }
+
+                        // Binary Blob Download (PDF)
+                        const blob = await response.blob();
+                        let filename = `TIN_${type.replace(/[^a-zA-Z0-9_-]/g, '_')}.pdf`;
+                        const disposition = response.headers.get('content-disposition');
+                        if (disposition) {
+                            const filenameMatch = disposition.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/);
+                            if (filenameMatch && filenameMatch[1]) {
+                                filename = filenameMatch[1].replace(/['"]/g, '').trim();
+                            }
+                        }
+
+                        const downloadUrl = window.URL.createObjectURL(blob);
+                        const a = document.createElement('a');
+                        a.style.display = 'none';
+                        a.href = downloadUrl;
+                        a.download = filename;
+                        document.body.appendChild(a);
+                        a.click();
+                        setTimeout(() => {
+                            document.body.removeChild(a);
+                            window.URL.revokeObjectURL(downloadUrl);
+                        }, 100);
+
+                        Swal.fire({
+                            icon: 'success',
+                            title: 'Downloaded!',
+                            text: `${type} downloaded successfully without refreshing the page!`,
+                            timer: 3000,
+                            showConfirmButton: false,
+                            toast: true,
+                            position: 'top-end'
+                        });
+                    })
+                    .catch((err) => {
+                        Swal.fire({
+                            title: 'Network Error',
+                            text: 'An error occurred during slip download: ' + (err.message || 'Please check your connection.'),
+                            icon: 'error',
+                            confirmButtonColor: '#3085d6'
+                        });
+                    });
                 });
             }
         });

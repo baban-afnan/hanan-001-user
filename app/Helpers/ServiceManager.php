@@ -22,17 +22,18 @@ class ServiceManager
         );
 
         foreach ($fields as $field) {
-            ServiceField::updateOrCreate(
-                [
-                    'field_code' => $field['code']
-                ],
-                [
-                    'service_id' => $service->id,
-                    'field_name' => $field['name'],
-                    'is_active' => true,
-                    'base_price' => $field['price'] ?? 0
-                ]
-            );
+            // Skip the service field if it already exists; do not update
+            if (ServiceField::where('field_code', $field['code'])->exists()) {
+                continue;
+            }
+
+            ServiceField::create([
+                'service_id' => $service->id,
+                'field_name' => $field['name'],
+                'field_code' => $field['code'],
+                'is_active' => true,
+                'base_price' => $field['price'] ?? 0,
+            ]);
         }
 
         return $service;

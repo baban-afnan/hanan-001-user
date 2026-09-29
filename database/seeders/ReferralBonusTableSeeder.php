@@ -14,13 +14,13 @@ class ReferralBonusTableSeeder extends Seeder
      */
     public function run(): void
     {
-         DB::table('referral_bonus')->updateOrInsert(
-                ['id' => 1],
-                [
-                    'bonus' => '100',
-                    'created_at' => Carbon::now(),
-                    'updated_at' => Carbon::now(),
-                ]
-             );
+        if (!DB::table('referral_bonus')->where('id', 1)->exists()) {
+            DB::table('referral_bonus')->insert([
+                'id' => 1,
+                'bonus' => '100',
+                'created_at' => Carbon::now(),
+                'updated_at' => Carbon::now(),
+            ]);
+        }
     }
 }

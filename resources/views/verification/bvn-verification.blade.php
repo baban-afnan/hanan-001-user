@@ -309,52 +309,112 @@
                 confirmButtonText: 'Yes, Proceed!',
                 cancelButtonText: 'Cancel'
             }).then((result) => {
-                if (result.isConfirmed) {
-                    
-                    if(isDirectDownload) {
-                        // For plastic slip or direct downloads
-                        window.location.href = url;
+                if (!result.isConfirmed) return;
+
+                // Show loading state
+                Swal.fire({
+                    title: 'Generating Slip...',
+                    text: 'Please wait while we process your request. Do not refresh.',
+                    allowOutsideClick: false,
+                    allowEscapeKey: false,
+                    showConfirmButton: false,
+                    didOpen: () => {
+                        Swal.showLoading();
+                    }
+                });
+
+                // Use background fetch so the page never reloads
+                fetch(url, {
+                    method: 'GET',
+                    headers: {
+                        'Accept': 'application/pdf, application/json, text/html, */*',
+                        'X-Requested-With': 'XMLHttpRequest'
+                    }
+                })
+                .then(async (response) => {
+                    const contentType = response.headers.get('content-type') || '';
+
+                    if (!response.ok) {
+                        let errorMsg = `Download failed (HTTP ${response.status})`;
+                        try {
+                            if (contentType.includes('application/json')) {
+                                const errData = await response.json();
+                                errorMsg = errData.message || (errData.errors ? Object.values(errData.errors).flat().join('<br>') : errorMsg);
+                            } else {
+                                const errText = await response.text();
+                                if (errText && errText.length < 300) errorMsg = errText;
+                            }
+                        } catch (e) {}
+
+                        Swal.fire({
+                            title: 'Failed!',
+                            html: errorMsg,
+                            icon: 'error',
+                            confirmButtonColor: '#3085d6'
+                        });
                         return;
                     }
 
-                    // Show loading state
-                    Swal.fire({
-                        title: 'Generating Slip...',
-                        text: 'Please wait while we process your request.',
-                        allowOutsideClick: false,
-                        didOpen: () => {
-                            Swal.showLoading();
-                        }
-                    });
-
-                    // Use AJAX to fetch the view/json
-                    $.ajax({
-                        url: url,
-                        type: 'GET',
-                        success: function(response) {
-                            Swal.close(); // Close loading
-                            
-                            if (response.view) {
-                                // Open the view in a new window/tab for printing
-                                var newWindow = window.open('', '_blank');
-                                newWindow.document.write(response.view);
+                    if (contentType.includes('application/json')) {
+                        const jsonData = await response.json();
+                        Swal.close();
+                        if (jsonData.view) {
+                            var newWindow = window.open('', '_blank');
+                            if (newWindow) {
+                                newWindow.document.write(jsonData.view);
                                 newWindow.document.close();
                             } else {
-                                Swal.fire('Error', 'Failed to generate slip response.', 'error');
+                                Swal.fire('Pop-up Blocked', 'Please allow pop-ups for this site to view and print your slip.', 'warning');
                             }
-                        },
-                        error: function(xhr) {
-                            Swal.close(); // Close loading
-                            var msg = 'An error occurred.';
-                            if (xhr.responseJSON && xhr.responseJSON.errors) {
-                                msg = Object.values(xhr.responseJSON.errors).join('\n');
-                            } else if (xhr.responseJSON && xhr.responseJSON.message) {
-                                msg = xhr.responseJSON.message;
-                            }
-                            Swal.fire('Failed!', msg, 'error');
+                        } else if (jsonData.message) {
+                            Swal.fire('Notice', jsonData.message, 'info');
+                        } else {
+                            Swal.fire('Error', 'Failed to generate slip response.', 'error');
                         }
+                        return;
+                    }
+
+                    // Direct binary download (Plastic Slip PDF)
+                    const blob = await response.blob();
+                    let filename = `${type.replace(/[^a-zA-Z0-9_-]/g, '_')}.pdf`;
+                    const disposition = response.headers.get('content-disposition');
+                    if (disposition) {
+                        const filenameMatch = disposition.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/);
+                        if (filenameMatch && filenameMatch[1]) {
+                            filename = filenameMatch[1].replace(/['"]/g, '').trim();
+                        }
+                    }
+
+                    const downloadUrl = window.URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.style.display = 'none';
+                    a.href = downloadUrl;
+                    a.download = filename;
+                    document.body.appendChild(a);
+                    a.click();
+                    setTimeout(() => {
+                        document.body.removeChild(a);
+                        window.URL.revokeObjectURL(downloadUrl);
+                    }, 100);
+
+                    Swal.fire({
+                        icon: 'success',
+                        title: 'Downloaded!',
+                        text: `${type} downloaded successfully without refreshing the page!`,
+                        timer: 3000,
+                        showConfirmButton: false,
+                        toast: true,
+                        position: 'top-end'
                     });
-                }
+                })
+                .catch((err) => {
+                    Swal.fire({
+                        title: 'Network Error',
+                        text: 'An error occurred during slip download: ' + (err.message || 'Please check your connection.'),
+                        icon: 'error',
+                        confirmButtonColor: '#3085d6'
+                    });
+                });
             });
         }
     </script>

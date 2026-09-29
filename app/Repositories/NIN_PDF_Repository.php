@@ -23,28 +23,37 @@ class NIN_PDF_Repository
         return $this->generateBasicPDF($nin_no, 'Free');
     }
 
+    private function findRecord($nin_no)
+    {
+        return Verification::where(function ($q) use ($nin_no) {
+            $q->where('number_nin', $nin_no)
+              ->orWhere('nin', $nin_no)
+              ->orWhere('id', $nin_no);
+        })
+        ->latest()
+        ->first();
+    }
+
     private function generateBasicPDF($nin_no, $type)
     {
-        if (Verification::where('number_nin', $nin_no)->exists()) {
-            $verifiedRecord = Verification::where('number_nin', $nin_no)
-                ->latest()
-                ->first();
+        $verifiedRecord = $this->findRecord($nin_no);
 
+        if ($verifiedRecord) {
             $ninData = [
                 "nin" => $verifiedRecord->nin ?? $verifiedRecord->number_nin ?? $verifiedRecord->idno,
-                "fName" => $verifiedRecord->firstname,
-                "sName" => $verifiedRecord->surname,
-                "mName" => $verifiedRecord->middlename,
-                "tId" => $verifiedRecord->trackingId,
-                "address" => $verifiedRecord->residence_address ?? $verifiedRecord->address,
-                "lga" => $verifiedRecord->residence_lga ?? $verifiedRecord->lga,
-                "state" => $verifiedRecord->residence_state ?? $verifiedRecord->state,
+                "fName" => $verifiedRecord->firstname ?? '',
+                "sName" => $verifiedRecord->surname ?? '',
+                "mName" => $verifiedRecord->middlename ?? '',
+                "tId" => $verifiedRecord->trackingId ?? '',
+                "address" => $verifiedRecord->residence_address ?? ($verifiedRecord->address ?? ''),
+                "lga" => $verifiedRecord->residence_lga ?? ($verifiedRecord->lga ?? ''),
+                "state" => $verifiedRecord->residence_state ?? ($verifiedRecord->state ?? ''),
                 "gender" => ($verifiedRecord->gender === 'Male' || $verifiedRecord->gender === 'M') ? "M" : "F",
-                "birthdate" => $verifiedRecord->birthdate,
-                "photo" => preg_replace('/^data:image\/\w+;base64,/', '', $verifiedRecord->photo_path ?? $verifiedRecord->photo)
+                "birthdate" => $verifiedRecord->birthdate ?? '',
+                "photo" => preg_replace('/^data:image\/\w+;base64,/', '', $verifiedRecord->photo_path ?? ($verifiedRecord->photo ?? ''))
             ];
 
-            $names = $verifiedRecord->firstname . ' ' . $verifiedRecord->surname;
+            $names = trim(($verifiedRecord->firstname ?? '') . ' ' . ($verifiedRecord->surname ?? ''));
             
             // Initialize TCPDF
             $pdf = new TCPDF('P', 'mm', 'A4', true, 'UTF-8');
@@ -63,9 +72,9 @@ class NIN_PDF_Repository
 
             // Load the background image
             if ($type === 'Basic') {
-                $bg = 'assets/card_and_Slip/basic.jpg';
+                $bg = public_path('assets/card_and_Slip/basic.jpg');
             } else {
-                $bg = 'assets/card_and_Slip/regular.png';
+                $bg = public_path('assets/card_and_Slip/regular.png');
             }
             
             $pdf->Image($bg, 15, 50, 178, 80, '', '', '', false, 300, '', false, false, 0);
@@ -120,26 +129,24 @@ class NIN_PDF_Repository
 
     public function standardPDF($nin_no)
     {
-        if (Verification::where('number_nin', $nin_no)->exists()) {
-            $verifiedRecord = Verification::where('number_nin', $nin_no)
-                ->latest()
-                ->first();
+        $verifiedRecord = $this->findRecord($nin_no);
 
+        if ($verifiedRecord) {
             $ninData = [
-                "nin" => $verifiedRecord->number_nin,
-                "fName" => $verifiedRecord->firstname,
-                "sName" => $verifiedRecord->surname,
-                "mName" => $verifiedRecord->middlename,
-                "tId" => $verifiedRecord->trackingId,
-                "address" => $verifiedRecord->residence_address,
-                "lga" => $verifiedRecord->residence_lga,
-                "state" => $verifiedRecord->residence_state,
-                "gender" => ($verifiedRecord->gender === 'Male') ? "M" : "F",
-                "birthdate" => $verifiedRecord->birthdate,
-                "photo" => str_replace('data:image/jpg;base64,', '', $verifiedRecord->photo_path)
+                "nin" => $verifiedRecord->nin ?? $verifiedRecord->number_nin ?? $verifiedRecord->idno,
+                "fName" => $verifiedRecord->firstname ?? '',
+                "sName" => $verifiedRecord->surname ?? '',
+                "mName" => $verifiedRecord->middlename ?? '',
+                "tId" => $verifiedRecord->trackingId ?? '',
+                "address" => $verifiedRecord->residence_address ?? ($verifiedRecord->address ?? ''),
+                "lga" => $verifiedRecord->residence_lga ?? ($verifiedRecord->lga ?? ''),
+                "state" => $verifiedRecord->residence_state ?? ($verifiedRecord->state ?? ''),
+                "gender" => ($verifiedRecord->gender === 'Male' || $verifiedRecord->gender === 'M') ? "M" : "F",
+                "birthdate" => $verifiedRecord->birthdate ?? '',
+                "photo" => preg_replace('/^data:image\/\w+;base64,/', '', $verifiedRecord->photo_path ?? ($verifiedRecord->photo ?? ''))
             ];
 
-            $names = $verifiedRecord->firstname . ' ' . $verifiedRecord->surname;
+            $names = trim(($verifiedRecord->firstname ?? '') . ' ' . ($verifiedRecord->surname ?? ''));
 
             // Generate PDF
             $pdf = new TCPDF('P', 'mm', 'A4', true, 'UTF-8');
@@ -159,8 +166,8 @@ class NIN_PDF_Repository
             $pdf->MultiCell(150, 20, $txt, 0, 'C', false, 1, 35, 20, true, 0, false, true, 0, 'T', false);
 
             // Add images
-            $pdf->Image('assets/card_and_Slip/standard.jpg', 70, 50, 80, 50, '', '', '', false, 300, '', false, false, 0);
-            $pdf->Image('assets/card_and_Slip/back.jpg', 70, 101, 80, 50, '', '', '', false, 300, '', false, false, 0);
+            $pdf->Image(public_path('assets/card_and_Slip/standard.jpg'), 70, 50, 80, 50, '', '', '', false, 300, '', false, false, 0);
+            $pdf->Image(public_path('assets/card_and_Slip/back.jpg'), 70, 101, 80, 50, '', '', '', false, 300, '', false, false, 0);
 
             // Add QR code
             $style = [
@@ -175,12 +182,15 @@ class NIN_PDF_Repository
             $datas = '{NIN: ' . $ninData['nin'] . ', NAME:' . $givenNames . ' ' . html_entity_decode($ninData['sName']) . ', birthdate: ' . $ninData['birthdate'] . ', Status:Verified}';
             
             $pdf->write2DBarcode($datas, 'QRCODE,H', 131.2, 64.7, 14.2, 13.5, $style, 'H');
-            $pdf->Image('assets/card_and_Slip/pin.png', 135.8, 69.5, 4.5, 4.5, '', '', '', false, 300, '', false, false, 0);
+            $pdf->Image(public_path('assets/card_and_Slip/pin.png'), 135.8, 69.5, 4.5, 4.5, '', '', '', false, 300, '', false, false, 0);
 
             // Decode photo
-            $photo = base64_decode($ninData['photo']);
-            if ($photo !== false) {
-                $pdf->Image('@' . $photo, 72, 62, 18, 23, '', '', '', false, 300, '', false, false, 0);
+            $photo = $ninData['photo'];
+            if (!empty($photo)) {
+                $imgdata = base64_decode($photo);
+                if ($imgdata !== false) {
+                    $pdf->Image('@' . $imgdata, 72, 62, 18, 23, '', '', '', false, 300, '', false, false, 0);
+                }
             }
 
             // Add text fields
@@ -191,7 +201,7 @@ class NIN_PDF_Repository
             $pdf->Text(91.5, 72, $givenNames);
             
             $newD = strtotime($ninData['birthdate']);
-            $cdate = date("d M Y", $newD);
+            $cdate = $newD ? date("d M Y", $newD) : $ninData['birthdate'];
             $pdf->Text(91.5, 78.7, $cdate);
 
             $issueD = date("d M Y");
@@ -199,7 +209,7 @@ class NIN_PDF_Repository
 
             // Add NIN
             $nin = $ninData['nin'];
-            $newNin = substr($nin, 0, 4) . " " . substr($nin, 4, 3) . " " . substr($nin, 7);
+            $newNin = strlen($nin) === 11 ? (substr($nin, 0, 4) . " " . substr($nin, 4, 3) . " " . substr($nin, 7)) : $nin;
             $pdf->SetFont('helvetica', '', 21);
             $pdf->Text(81, 89, $newNin);
 
@@ -228,26 +238,24 @@ class NIN_PDF_Repository
 
     public function premiumPDF($nin_no)
     {
-        if (Verification::where('number_nin', $nin_no)->exists()) {
-            $verifiedRecord = Verification::where('number_nin', $nin_no)
-                ->latest()
-                ->first();
+        $verifiedRecord = $this->findRecord($nin_no);
 
+        if ($verifiedRecord) {
             $ninData = [
-                "nin" => $verifiedRecord->number_nin,
-                "fName" => $verifiedRecord->firstname,
-                "sName" => $verifiedRecord->surname,
-                "mName" => $verifiedRecord->middlename,
-                "tId" => $verifiedRecord->trackingId,
-                "address" => $verifiedRecord->residence_address,
-                "lga" => $verifiedRecord->residence_lga,
-                "state" => $verifiedRecord->residence_state,
-                "gender" => ($verifiedRecord->gender === 'Male') ? "M" : "F",
-                "birthdate" => $verifiedRecord->birthdate,
-                "photo" => str_replace('data:image/jpg;base64,', '', $verifiedRecord->photo_path)
+                "nin" => $verifiedRecord->nin ?? $verifiedRecord->number_nin ?? $verifiedRecord->idno,
+                "fName" => $verifiedRecord->firstname ?? '',
+                "sName" => $verifiedRecord->surname ?? '',
+                "mName" => $verifiedRecord->middlename ?? '',
+                "tId" => $verifiedRecord->trackingId ?? '',
+                "address" => $verifiedRecord->residence_address ?? ($verifiedRecord->address ?? ''),
+                "lga" => $verifiedRecord->residence_lga ?? ($verifiedRecord->lga ?? ''),
+                "state" => $verifiedRecord->residence_state ?? ($verifiedRecord->state ?? ''),
+                "gender" => ($verifiedRecord->gender === 'Male' || $verifiedRecord->gender === 'M') ? "M" : "F",
+                "birthdate" => $verifiedRecord->birthdate ?? '',
+                "photo" => preg_replace('/^data:image\/\w+;base64,/', '', $verifiedRecord->photo_path ?? ($verifiedRecord->photo ?? ''))
             ];
 
-            $names = html_entity_decode($verifiedRecord->firstname) . ' ' . html_entity_decode($verifiedRecord->surname);
+            $names = trim(html_entity_decode($ninData['fName']) . ' ' . html_entity_decode($ninData['sName']));
 
             // Initialize TCPDF
             $pdf = new TCPDF('P', 'mm', 'A4', true, 'UTF-8');
@@ -265,8 +273,8 @@ class NIN_PDF_Repository
             $pdf->MultiCell(150, 20, $txt, 0, 'C', false, 1, 35, 20, true, 0, false, true, 0, 'T', false);
 
             // Images
-            $pdf->Image('assets/card_and_Slip/premium.jpg', 70, 50, 80, 50, 'JPG', '', '', false, 300, '', false, false, 0);
-            $pdf->Image('assets/card_and_Slip/back.jpg', 70, 101, 80, 50, 'JPG', '', '', false, 300, '', false, false, 0);
+            $pdf->Image(public_path('assets/card_and_Slip/premium.jpg'), 70, 50, 80, 50, 'JPG', '', '', false, 300, '', false, false, 0);
+            $pdf->Image(public_path('assets/card_and_Slip/back.jpg'), 70, 101, 80, 50, 'JPG', '', '', false, 300, '', false, false, 0);
 
             // Barcode
             $style = [
@@ -284,9 +292,11 @@ class NIN_PDF_Repository
 
             // Photo
             $photo = $ninData['photo'];
-            $imgdata = base64_decode($photo);
-            if ($imgdata !== false) {
-                $pdf->Image('@' . $imgdata, 71.5, 62, 20, 25, 'JPG', '', '', false, 300, '', false, false, 0);
+            if (!empty($photo)) {
+                $imgdata = base64_decode($photo);
+                if ($imgdata !== false) {
+                    $pdf->Image('@' . $imgdata, 71.5, 62, 20, 25, 'JPG', '', '', false, 300, '', false, false, 0);
+                }
             }
 
             // Text
@@ -299,7 +309,7 @@ class NIN_PDF_Repository
 
             $birthdate = $ninData['birthdate'];
             $newD = strtotime($birthdate);
-            $cdate = date("d M Y", $newD);
+            $cdate = $newD ? date("d M Y", $newD) : $birthdate;
             $pdf->SetFont('helvetica', '', 8);
             $pdf->Text(93.3, 80.5, $cdate);
 
@@ -314,7 +324,7 @@ class NIN_PDF_Repository
             // Format NIN
             $nin = $ninData['nin'];
             $pdf->setTextColor(0, 0, 0);
-            $newNin = substr($nin, 0, 4) . " " . substr($nin, 4, 3) . " " . substr($nin, 7);
+            $newNin = strlen($nin) === 11 ? (substr($nin, 0, 4) . " " . substr($nin, 4, 3) . " " . substr($nin, 7)) : $nin;
             $pdf->SetFont('helvetica', '', 21);
             $pdf->Text(81, 91, $newNin);
 
@@ -441,26 +451,24 @@ class NIN_PDF_Repository
 
     public function vninPDF($nin_no)
     {
-        if (Verification::where('number_nin', $nin_no)->exists()) {
-            $verifiedRecord = Verification::where('number_nin', $nin_no)
-                ->latest()
-                ->first();
+        $verifiedRecord = $this->findRecord($nin_no);
 
+        if ($verifiedRecord) {
             $ninData = [
-                "nin" => $verifiedRecord->number_nin,
-                "fName" => $verifiedRecord->firstname,
-                "sName" => $verifiedRecord->surname,
-                "mName" => $verifiedRecord->middlename,
-                "tId" => $verifiedRecord->trackingId,
-                "address" => $verifiedRecord->residence_address,
-                "lga" => $verifiedRecord->residence_lga,
-                "state" => $verifiedRecord->residence_state,
-                "gender" => ($verifiedRecord->gender === 'Male') ? "M" : "F",
-                "birthdate" => $verifiedRecord->birthdate,
-                "photo" => str_replace('data:image/jpg;base64,', '', $verifiedRecord->photo_path),
-                "created_at" => $verifiedRecord->created_at,
-                "reference" => $verifiedRecord->reference,
-                "agent_id" => $verifiedRecord->performed_by,
+                "nin" => $verifiedRecord->nin ?? $verifiedRecord->number_nin ?? $verifiedRecord->idno,
+                "fName" => $verifiedRecord->firstname ?? '',
+                "sName" => $verifiedRecord->surname ?? '',
+                "mName" => $verifiedRecord->middlename ?? '',
+                "tId" => $verifiedRecord->trackingId ?? '',
+                "address" => $verifiedRecord->residence_address ?? ($verifiedRecord->address ?? ''),
+                "lga" => $verifiedRecord->residence_lga ?? ($verifiedRecord->lga ?? ''),
+                "state" => $verifiedRecord->residence_state ?? ($verifiedRecord->state ?? ''),
+                "gender" => ($verifiedRecord->gender === 'Male' || $verifiedRecord->gender === 'M') ? "M" : "F",
+                "birthdate" => $verifiedRecord->birthdate ?? '',
+                "photo" => preg_replace('/^data:image\/\w+;base64,/', '', $verifiedRecord->photo_path ?? ($verifiedRecord->photo ?? '')),
+                "created_at" => $verifiedRecord->created_at ?? now(),
+                "reference" => $verifiedRecord->reference ?? '',
+                "agent_id" => $verifiedRecord->performed_by ?? '',
             ];
 
             // Generate PDF - Portrait
@@ -494,7 +502,7 @@ class NIN_PDF_Repository
             };
 
             // 1. Load the background template
-            $pdf->Image('assets/card_and_Slip/vnin.png', $marginX, $marginY, $slipW, $slipH, 'PNG', '', '', false, 300, '', false, false, 0);
+            $pdf->Image(public_path('assets/card_and_Slip/vnin.png'), $marginX, $marginY, $slipW, $slipH, 'PNG', '', '', false, 300, '', false, false, 0);
 
             // 2. Add photo (if exists)
             if (!empty($ninData['photo'])) {
@@ -512,7 +520,6 @@ class NIN_PDF_Repository
             $givenNames = trim(($ninData['fName'] ?? '') . ' ' . ($ninData['mName'] ?? ''));
 
             // 3. Left QR CODE Section Details
-            // Included Middle Name in QR data to consistent with "Given Names"
             $qrData = 'NIN: ' . $ninData['nin'] . 
             ', Name: ' . $ninData['sName'] . ' ' . $givenNames . 
             ', DOB: ' . ($ninData['birthdate'] ?? '');
@@ -565,9 +572,9 @@ class NIN_PDF_Repository
             $pdf->SetFont('courier', 'B', 7);
             $pdf->SetTextColor(38, 38, 38);
             
-            // Use 'v' for milliseconds if PHP >= 7.3, otherwise manual substring of 'u'
-            $milliseconds = substr($ninData['created_at']->format('u'), 0, 3);
-            $baseString = $ninData['created_at']->format('Y-m-d\TH:i:s') . '.' . $milliseconds . ($ninData['reference'] ?? '');
+            $createdAt = $ninData['created_at'] instanceof \Carbon\Carbon ? $ninData['created_at'] : \Carbon\Carbon::parse($ninData['created_at'] ?? now());
+            $milliseconds = substr($createdAt->format('u'), 0, 3);
+            $baseString = $createdAt->format('Y-m-d\TH:i:s') . '.' . $milliseconds . ($ninData['reference'] ?? '');
             
             // Ensure the string is exactly 56 characters
             if (strlen($baseString) < 56) {

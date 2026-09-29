@@ -260,8 +260,8 @@ class BvnverificationController extends Controller
      */
     private function chargeForSlip($user, $fieldCode)
     {
-         // 1. Get Verification Service from DB
-         $service = Services1::where('name', 'Verification')->first();
+        // 1. Get Verification Service from DB
+        $service = Services1::where('name', 'Verification')->first();
 
         if (!$service) {
             throw new \Exception('Verification service not available.');
@@ -274,7 +274,7 @@ class BvnverificationController extends Controller
             ->first();
 
         if (!$serviceField) {
-             throw new \Exception('Slip service not available.');
+            throw new \Exception('Slip service not available.');
         }
 
         // 3. Determine service price based on user role
@@ -284,116 +284,131 @@ class BvnverificationController extends Controller
         $wallet = Wallet::where('user_id', $user->id)->firstOrFail();
 
         if ($wallet->balance < $servicePrice) {
-             throw new \Exception('Insufficient wallet balance.');
+            throw new \Exception('Insufficient wallet balance. Price: ₦' . number_format($servicePrice, 2) . ', Balance: ₦' . number_format($wallet->balance, 2));
         }
-        
-        DB::beginTransaction();
-        try {
-             $transactionRef = 'Slip-' . (time() % 1000000000) . '-' . mt_rand(100, 999);
-             $performedBy = $user->first_name . ' ' . $user->last_name;
- 
-             Transaction::create([
-                 'referenceId' => $transactionRef,
-                 'user_id' => $user->id,
-                 'amount' => $servicePrice,
-                 'service_type' => 'Slip Download',
-                 'service_description' => "Slip Download: {$serviceField->field_name}",
-                 'type' => 'debit',
-                 'status' => 'Approved',
-             ]);
- 
-             // Deduct wallet balance
-             $wallet->decrement('balance', $servicePrice);
-             
-             DB::commit();
-             return true;
 
-        } catch (\Exception $e) {
-            DB::rollBack();
-            throw $e;
-        }
+        $transactionRef = 'Slip-' . (time() % 1000000000) . '-' . mt_rand(100, 999);
+
+        Transaction::create([
+            'referenceId' => $transactionRef,
+            'user_id' => $user->id,
+            'amount' => $servicePrice,
+            'service_type' => 'Slip Download',
+            'service_description' => "Slip Download: {$serviceField->field_name}",
+            'type' => 'debit',
+            'status' => 'Approved',
+        ]);
+
+        // Deduct wallet balance
+        $wallet->decrement('balance', $servicePrice);
+        return $servicePrice;
     }
-
 
     /**
      * Download PDF slips
      */
     public function standardBVN($bvn_no)
     {
+        $user = Auth::user();
+        $veridiedRecord = Verification::where('user_id', $user->id)
+            ->where(function($q) use ($bvn_no) {
+                $q->where('idno', $bvn_no)
+                  ->orWhere('bvn', $bvn_no)
+                  ->orWhere('id', $bvn_no);
+            })
+            ->latest()
+            ->first();
+
+        if (!$veridiedRecord) {
+            return response()->json([
+                "message" => "Verification record not found or unauthorized access.",
+                "errors" => ["Not Found" => "Verification record not found or unauthorized access."]
+            ], 404);
+        }
+
         DB::beginTransaction();
         try {
-            $this->chargeForSlip(Auth::user(), '601'); // Charge for Standard Slip
-            
-            if (Verification::where('idno', $bvn_no)->exists()) {
-                $veridiedRecord = Verification::where('idno', $bvn_no)
-                    ->latest()
-                    ->first();
-
-                // Using user's requested view name: freeBVN
-                $view = view('freeBVN', compact('veridiedRecord'))->render();
-                DB::commit();
-                return response()->json(['view' => $view]);
-            } else {
-                DB::rollBack();
-                return response()->json([
-                    "message" => "Error",
-                    "errors" => array("Not Found" => "Verification record not found !")
-                ], 422);
-            }
+            $this->chargeForSlip($user, '601'); // Charge for Standard Slip
+            $view = view('freeBVN', ['veridiedRecord' => $veridiedRecord, 'verifiedRecord' => $veridiedRecord])->render();
+            DB::commit();
+            return response()->json(['view' => $view]);
         } catch (\Exception $e) {
-             DB::rollBack();
-             return response()->json([
-                "message" => "Error",
-                "errors" => array("Charge Failed" => $e->getMessage())
+            DB::rollBack();
+            return response()->json([
+                "message" => $e->getMessage(),
+                "errors" => ["Charge Failed" => $e->getMessage()]
             ], 422);
         }
     }
 
     public function premiumBVN($bvn_no)
     {
+        $user = Auth::user();
+        $veridiedRecord = Verification::where('user_id', $user->id)
+            ->where(function($q) use ($bvn_no) {
+                $q->where('idno', $bvn_no)
+                  ->orWhere('bvn', $bvn_no)
+                  ->orWhere('id', $bvn_no);
+            })
+            ->latest()
+            ->first();
+
+        if (!$veridiedRecord) {
+            return response()->json([
+                "message" => "Verification record not found or unauthorized access.",
+                "errors" => ["Not Found" => "Verification record not found or unauthorized access."]
+            ], 404);
+        }
+
         DB::beginTransaction();
         try {
-            $this->chargeForSlip(Auth::user(), '602'); // Charge for Premium Slip
-
-            if (Verification::where('idno', $bvn_no)->exists()) {
-                $veridiedRecord = Verification::where('idno', $bvn_no)
-                    ->latest()
-                    ->first();
-
-                // Using user's requested view name: PremiumBVN
-                $view = view('PremiumBVN', compact('veridiedRecord'))->render();
-                DB::commit();
-                return response()->json(['view' => $view]);
-            } else {
-                DB::rollBack();
-                return response()->json([
-                    "message" => "Error",
-                    "errors" => array("Not Found" => "Verification record not found !")
-                ], 422);
-            }
+            $this->chargeForSlip($user, '602'); // Charge for Premium Slip
+            $view = view('PremiumBVN', ['veridiedRecord' => $veridiedRecord, 'verifiedRecord' => $veridiedRecord])->render();
+            DB::commit();
+            return response()->json(['view' => $view]);
         } catch (\Exception $e) {
             DB::rollBack();
             return response()->json([
-               "message" => "Error",
-               "errors" => array("Charge Failed" => $e->getMessage())
-           ], 422);
-       }
+                "message" => $e->getMessage(),
+                "errors" => ["Charge Failed" => $e->getMessage()]
+            ], 422);
+        }
     }
 
     public function plasticBVN($bvn_no)
     {
-         DB::beginTransaction();
-         try {
-            $this->chargeForSlip(Auth::user(), '603'); // Charge for Plastic Slip
+        $user = Auth::user();
+        $veridiedRecord = Verification::where('user_id', $user->id)
+            ->where(function($q) use ($bvn_no) {
+                $q->where('idno', $bvn_no)
+                  ->orWhere('bvn', $bvn_no)
+                  ->orWhere('id', $bvn_no);
+            })
+            ->latest()
+            ->first();
+
+        if (!$veridiedRecord) {
+            if (request()->expectsJson() || request()->ajax() || request()->header('X-Requested-With') === 'XMLHttpRequest') {
+                return response()->json(['message' => 'Verification record not found or unauthorized access.'], 404);
+            }
+            return back()->with('error', 'Verification record not found or unauthorized access.');
+        }
+
+        DB::beginTransaction();
+        try {
+            $this->chargeForSlip($user, '603'); // Charge for Plastic Slip
             
             $repObj = new BVN_PDF_Repository();
-            $pdf = $repObj->plasticPDF($bvn_no);
+            $targetBvn = $veridiedRecord->idno ?? $veridiedRecord->bvn ?? $bvn_no;
+            $pdf = $repObj->plasticPDF($targetBvn);
             DB::commit();
             return $pdf;
-         } catch (\Exception $e) {
-             DB::rollBack();
-             // For plastic PDF, we might need to return a view or redirect with error since it's a direct link
-             return back()->with('error', $e->getMessage());
+        } catch (\Exception $e) {
+            DB::rollBack();
+            if (request()->expectsJson() || request()->ajax() || request()->header('X-Requested-With') === 'XMLHttpRequest') {
+                return response()->json(['message' => $e->getMessage()], 422);
+            }
+            return back()->with('error', $e->getMessage());
         }
     }
 }

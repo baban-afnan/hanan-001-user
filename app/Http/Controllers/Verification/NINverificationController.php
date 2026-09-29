@@ -3,7 +3,6 @@
 namespace App\Http\Controllers\Verification;
 
 use App\Http\Controllers\Controller;
-use App\Helpers\ServiceManager;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
@@ -11,7 +10,9 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
 use App\Models\Verification;
 use App\Models\Transaction;
+use App\Helpers\ServiceManager;
 use App\Models\Service;
+use App\Models\Services1;
 use App\Models\ServiceField;
 use App\Models\Wallet;
 use App\Repositories\NIN_PDF_Repository;
@@ -26,15 +27,8 @@ class NINverificationController extends Controller
     {
         $user = auth()->user();
 
-        // Get Verification Service using ServiceManager
-        $service = ServiceManager::getServiceWithFields('Verification', [
-            ['name' => 'Verify NIN', 'code' => '610', 'price' => 80],
-            ['name' => 'Basic Slip', 'code' => 'V101', 'price' => 50],
-            ['name' => 'Regular Slip', 'code' => 'V102', 'price' => 100],
-            ['name' => 'standard slip', 'code' => '611', 'price' => 100],
-            ['name' => 'preminum slip', 'code' => '612', 'price' => 150],
-            ['name' => '1Vnin slip', 'code' => '616', 'price' => 100],
-        ]);
+        // Get Verification Service from DB
+        $service = Services1::where('name', 'Verification')->first();
         
         // Get Prices
         $verificationPrice = 0;
@@ -84,10 +78,8 @@ class NINverificationController extends Controller
             'number_nin' => 'required|string|size:11|regex:/^[0-9]{11}$/',
         ]);
 
-        // 1. Get Verification Service using ServiceManager
-        $service = ServiceManager::getServiceWithFields('Verification', [
-            ['name' => 'Verify NIN', 'code' => '610', 'price' => 80],
-        ]);
+        // 1. Get Verification Service from DB
+        $service = Services1::where('name', 'Verification')->first();
 
         if (!$service) {
             return back()->with([
@@ -428,14 +420,8 @@ class NINverificationController extends Controller
      */
     private function chargeForSlip($user, $fieldCode)
     {
-         // 1. Get Verification Service using ServiceManager
-         $service = ServiceManager::getServiceWithFields('Verification', [
-            ['name' => 'Basic Slip', 'code' => 'V101', 'price' => 50],
-            ['name' => 'Regular Slip', 'code' => 'V102', 'price' => 100],
-            ['name' => 'standard slip', 'code' => '611', 'price' => 100],
-            ['name' => 'preminum slip', 'code' => '612', 'price' => 150],
-            ['name' => '1Vnin slip', 'code' => '616', 'price' => 100],
-        ]);
+        // 1. Get Verification Service from DB
+        $service = Services1::where('name', 'Verification')->first();
 
         if (!$service) {
             throw new \Exception('Verification service not available.');
@@ -457,38 +443,84 @@ class NINverificationController extends Controller
         // 4. Check wallet
         $wallet = Wallet::where('user_id', $user->id)->firstOrFail();
 
-        if ($wallet->status !== 'active') {
-             throw new \Exception('Your wallet is not active.');
-        }
-
         if ($wallet->balance < $servicePrice) {
-             throw new \Exception('Insufficient wallet balance.');
+            throw new \Exception('Insufficient wallet balance. Price: ₦' . number_format($servicePrice, 2) . ', Balance: ₦' . number_format($wallet->balance, 2));
         }
         
+        $transactionRef = 'Slip-' . (time() % 1000000000) . '-' . mt_rand(100, 999);
+
+        Transaction::create([
+            'referenceId' => $transactionRef,
+            'user_id' => $user->id,
+            'amount' => $servicePrice,
+            'service_type' => 'Slip Download',
+            'service_description' => "Slip Download: {$serviceField->field_name}",
+            'type' => 'debit',
+            'status' => 'Approved',
+        ]);
+
+        // Deduct wallet balance
+        $wallet->decrement('balance', $servicePrice);
+        return $servicePrice;
+    }
+
+    /**
+     * Helper to securely download NIN slip with atomic charge and rollback
+     */
+    private function downloadNinSlip($nin_no, $fieldCode, $pdfMethod)
+    {
+        $user = Auth::user();
+        if (!$user) {
+            if (request()->expectsJson() || request()->ajax()) {
+                return response()->json(['message' => 'Unauthenticated.'], 401);
+            }
+            return redirect()->route('login');
+        }
+
+        // 1. Verify existence and ownership BEFORE charging
+        $record = Verification::where(function ($q) use ($nin_no) {
+            $q->where('number_nin', $nin_no)
+              ->orWhere('nin', $nin_no)
+              ->orWhere('id', $nin_no);
+        })
+        ->where(function ($q) use ($user) {
+            if ($user->role !== 'admin') {
+                $q->where('user_id', $user->id);
+            }
+        })
+        ->latest()
+        ->first();
+
+        if (!$record) {
+            if (request()->expectsJson() || request()->ajax()) {
+                return response()->json(['message' => 'Verification record not found or you are not authorized.'], 404);
+            }
+            return back()->with('error', 'Verification record not found or you are not authorized.');
+        }
+
         DB::beginTransaction();
         try {
-             $transactionRef = 'Slip-' . (time() % 1000000000) . '-' . mt_rand(100, 999);
-             $performedBy = $user->first_name . ' ' . $user->last_name;
- 
-             Transaction::create([
-                 'referenceId' => $transactionRef,
-                 'user_id' => $user->id,
-                 'amount' => $servicePrice,
-                 'service_type' => 'Slip Download',
-                 'service_description' => "Slip Download: {$serviceField->field_name}",
-                 'type' => 'debit',
-                 'status' => 'Approved',
-             ]);
- 
-             // Deduct wallet balance
-             $wallet->decrement('balance', $servicePrice);
-             
-             DB::commit();
-             return true;
+            // 2. Charge wallet for slip
+            $this->chargeForSlip($user, $fieldCode);
 
+            // 3. Generate PDF
+            $repObj = new NIN_PDF_Repository();
+            $targetNin = $record->number_nin ?? $record->nin;
+            $response = $repObj->$pdfMethod($targetNin);
+
+            if ($response instanceof \Illuminate\Http\JsonResponse && $response->getStatusCode() >= 400) {
+                DB::rollBack();
+                return $response;
+            }
+
+            DB::commit();
+            return $response;
         } catch (\Exception $e) {
             DB::rollBack();
-            throw $e;
+            if (request()->expectsJson() || request()->ajax()) {
+                return response()->json(['message' => $e->getMessage()], 422);
+            }
+            return back()->with('error', $e->getMessage());
         }
     }
 
@@ -497,62 +529,27 @@ class NINverificationController extends Controller
      */
     public function basicSlip($nin_no)
     {
-        try {
-            $this->chargeForSlip(Auth::user(), 'V101'); // Charge for Basic Slip
-            
-            $repObj = new NIN_PDF_Repository();
-            return $repObj->basicPDF($nin_no);
-        } catch (\Exception $e) {
-            return back()->with('error', $e->getMessage());
-        }
+        return $this->downloadNinSlip($nin_no, 'V101', 'basicPDF');
     }
 
     public function regularSlip($nin_no)
     {
-        try {
-            $this->chargeForSlip(Auth::user(), 'V102'); // Charge for Regular Slip
-            
-            $repObj = new NIN_PDF_Repository();
-            return $repObj->regularPDF($nin_no);
-        } catch (\Exception $e) {
-            return back()->with('error', $e->getMessage());
-        }
+        return $this->downloadNinSlip($nin_no, 'V102', 'regularPDF');
     }
 
     public function standardSlip($nin_no)
     {
-        try {
-            $this->chargeForSlip(Auth::user(), '611'); // Charge for Standard Slip
-            
-            $repObj = new NIN_PDF_Repository();
-            return $repObj->standardPDF($nin_no);
-        } catch (\Exception $e) {
-            return back()->with('error', $e->getMessage());
-        }
+        return $this->downloadNinSlip($nin_no, '611', 'standardPDF');
     }
 
     public function premiumSlip($nin_no)
     {
-        try {
-            $this->chargeForSlip(Auth::user(), '612'); // Charge for Premium Slip
-            
-            $repObj = new NIN_PDF_Repository();
-            return $repObj->premiumPDF($nin_no);
-        } catch (\Exception $e) {
-            return back()->with('error', $e->getMessage());
-        }
+        return $this->downloadNinSlip($nin_no, '612', 'premiumPDF');
     }
 
     public function vninSlip($nin_no)
     {
-        try {
-            $this->chargeForSlip(Auth::user(), '616'); // Charge for VNIN Slip
-            
-            $repObj = new NIN_PDF_Repository();
-            return $repObj->vninPDF($nin_no);
-        } catch (\Exception $e) {
-            return back()->with('error', $e->getMessage());
-        }
+        return $this->downloadNinSlip($nin_no, '616', 'vninPDF');
     }
 
     /**

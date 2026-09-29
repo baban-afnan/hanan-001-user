@@ -385,32 +385,82 @@ class NINDemoVerificationController extends Controller
         $wallet = Wallet::where('user_id', $user->id)->firstOrFail();
 
         if ($wallet->balance < $servicePrice) {
-             throw new \Exception('Insufficient wallet balance.');
+            throw new \Exception('Insufficient wallet balance. Price: ₦' . number_format($servicePrice, 2) . ', Balance: ₦' . number_format($wallet->balance, 2));
         }
         
+        $transactionRef = 'Slip-' . (time() % 1000000000) . '-' . mt_rand(100, 999);
+
+        Transaction::create([
+            'referenceId' => $transactionRef,
+            'user_id' => $user->id,
+            'amount' => $servicePrice,
+            'service_type' => 'Slip Download',
+            'service_description' => "Slip Download: {$serviceField->field_name}",
+            'type' => 'debit',
+            'status' => 'Approved',
+        ]);
+
+        $wallet->decrement('balance', $servicePrice);
+        return $servicePrice;
+    }
+
+    /**
+     * Helper to securely download NIN slip with atomic charge and rollback
+     */
+    private function downloadNinSlip($nin_no, $fieldCode, $pdfMethod)
+    {
+        $user = Auth::user();
+        if (!$user) {
+            if (request()->expectsJson() || request()->ajax()) {
+                return response()->json(['message' => 'Unauthenticated.'], 401);
+            }
+            return redirect()->route('login');
+        }
+
+        // 1. Verify existence and ownership BEFORE charging
+        $record = Verification::where(function ($q) use ($nin_no) {
+            $q->where('number_nin', $nin_no)
+              ->orWhere('nin', $nin_no)
+              ->orWhere('id', $nin_no);
+        })
+        ->where(function ($q) use ($user) {
+            if ($user->role !== 'admin') {
+                $q->where('user_id', $user->id);
+            }
+        })
+        ->latest()
+        ->first();
+
+        if (!$record) {
+            if (request()->expectsJson() || request()->ajax()) {
+                return response()->json(['message' => 'Verification record not found or you are not authorized.'], 404);
+            }
+            return back()->with('error', 'Verification record not found or you are not authorized.');
+        }
+
         DB::beginTransaction();
         try {
-             $transactionRef = 'Slip-' . (time() % 1000000000) . '-' . mt_rand(100, 999);
-             $performedBy = $user->first_name . ' ' . $user->last_name;
- 
-             Transaction::create([
-                 'referenceId' => $transactionRef,
-                 'user_id' => $user->id,
-                 'amount' => $servicePrice,
-                 'service_type' => 'Slip Download',
-                 'service_description' => "Slip Download: {$serviceField->field_name}",
-                 'type' => 'debit',
-                 'status' => 'Approved',
-             ]);
- 
-             $wallet->decrement('balance', $servicePrice);
-             
-             DB::commit();
-             return true;
+            // 2. Charge wallet for slip
+            $this->chargeForSlip($user, $fieldCode);
 
+            // 3. Generate PDF
+            $repObj = new NIN_PDF_Repository();
+            $targetNin = $record->number_nin ?? $record->nin;
+            $response = $repObj->$pdfMethod($targetNin);
+
+            if ($response instanceof \Illuminate\Http\JsonResponse && $response->getStatusCode() >= 400) {
+                DB::rollBack();
+                return $response;
+            }
+
+            DB::commit();
+            return $response;
         } catch (\Exception $e) {
             DB::rollBack();
-            throw $e;
+            if (request()->expectsJson() || request()->ajax()) {
+                return response()->json(['message' => $e->getMessage()], 422);
+            }
+            return back()->with('error', $e->getMessage());
         }
     }
 
@@ -421,56 +471,26 @@ class NINDemoVerificationController extends Controller
 
     public function basicSlip($nin_no)
     {
-        try {
-            $this->chargeForSlip(Auth::user(), 'V101');
-            $repObj = new NIN_PDF_Repository();
-            return $repObj->basicPDF($nin_no);
-        } catch (\Exception $e) {
-            return back()->with('error', $e->getMessage());
-        }
+        return $this->downloadNinSlip($nin_no, 'V101', 'basicPDF');
     }
 
     public function regularSlip($nin_no)
     {
-        try {
-            $this->chargeForSlip(Auth::user(), 'V102');
-            $repObj = new NIN_PDF_Repository();
-            return $repObj->regularPDF($nin_no);
-        } catch (\Exception $e) {
-            return back()->with('error', $e->getMessage());
-        }
+        return $this->downloadNinSlip($nin_no, 'V102', 'regularPDF');
     }
 
     public function standardSlip($nin_no)
     {
-        try {
-            $this->chargeForSlip(Auth::user(), '611');
-            $repObj = new NIN_PDF_Repository();
-            return $repObj->standardPDF($nin_no);
-        } catch (\Exception $e) {
-            return back()->with('error', $e->getMessage());
-        }
+        return $this->downloadNinSlip($nin_no, '611', 'standardPDF');
     }
 
     public function premiumSlip($nin_no)
     {
-        try {
-            $this->chargeForSlip(Auth::user(), '612');
-            $repObj = new NIN_PDF_Repository();
-            return $repObj->premiumPDF($nin_no);
-        } catch (\Exception $e) {
-            return back()->with('error', $e->getMessage());
-        }
+        return $this->downloadNinSlip($nin_no, '612', 'premiumPDF');
     }
 
     public function vninSlip($nin_no)
     {
-        try {
-            $this->chargeForSlip(Auth::user(), '616');
-            $repObj = new NIN_PDF_Repository();
-            return $repObj->vninPDF($nin_no);
-        } catch (\Exception $e) {
-            return back()->with('error', $e->getMessage());
-        }
+        return $this->downloadNinSlip($nin_no, '616', 'vninPDF');
     }
 }

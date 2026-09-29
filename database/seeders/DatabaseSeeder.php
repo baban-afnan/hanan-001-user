@@ -21,36 +21,37 @@ class DatabaseSeeder extends Seeder
      public function run(): void
     {
 
-        // Temporarily disable foreign key checks so truncating referenced tables
-        // doesn't fail when other tables still have foreign key constraints.
-        DB::statement('SET FOREIGN_KEY_CHECKS=0;');
-        SiteSetting::truncate();
-        Service::truncate();
-        ClaimCount::truncate();
-        DB::statement('SET FOREIGN_KEY_CHECKS=1;');
+        User::updateOrCreate(
+            ['email' => 'admin@hanan.com.ng'],
+            [
+                'name' => 'HANAN ADMIN',
+                'email_verified_at' => now(),
+                'password' => Hash::make('@passwd12345'),
+                'role' => 'admin',
+            ]
+        );
 
-
-       User::updateOrCreate(
-        ['email' => 'admin@hanan.com.ng'],
-        [
-            'name' => 'HANAN ADMIN',
-            'email_verified_at' => now(),
-            'password' => Hash::make('@passwd12345'),
-            'role'=>'admin',
-        ]
-       );
-
-        SiteSetting::factory(1)->create();
+        if (!SiteSetting::exists()) {
+            SiteSetting::factory(1)->create();
+        }
 
         foreach (Service::factory()->withCustomData() as $data) {
+            // Skip the service if it already exists; do not update
+            if (Service::where('service_code', $data['service_code'])->exists()) {
+                continue;
+            }
             Service::create($data);
         }
 
-        ClaimCount::factory(1)->create();
+        if (!ClaimCount::exists()) {
+            ClaimCount::factory(1)->create();
+        }
 
-         $this->call([
-                ReferralBonusTableSeeder::class,
-                CrmSeeder::class,
-           ]);
+        $this->call([
+            ReferralBonusTableSeeder::class,
+            CrmSeeder::class,
+            ServiceSeeder::class,
+            PersonalisationSeeder::class,
+        ]);
     }
 }
