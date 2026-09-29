@@ -138,8 +138,10 @@ class ServiceSeeder extends Seeder
                 ['name' => 'NIN Migration', 'code' => '020', 'price' => 3000],
             ]);
 
-
-
+            // NIN Personalisation
+            ServiceManager::getServiceWithFields('NIN Personalisation', [
+                ['name' => 'NIN Personalisation', 'code' => '005', 'price' => 1500],
+            ]);
         
     }
 }

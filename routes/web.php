@@ -31,6 +31,8 @@ use App\Http\Controllers\Agency\BvnServicesController;
 use App\Http\Controllers\Agency\BvncrmController;
 use App\Http\Controllers\Agency\ManualSearchController;
 use App\Http\Controllers\Admin\BvncrmController as AdminBvncrmController;
+use App\Http\Controllers\Agency\NinPersonalisationController;
+use App\Http\Controllers\Admin\NinPersonalisationController as AdminNinPersonalisationController;
 
 
 // =========================================================================
@@ -178,6 +180,13 @@ Route::middleware(['auth', 'user.active'])->group(function () {
                 Route::get('/check/{id}', [NinModificationController::class, 'checkStatus'])->name('check');
             });
 
+            // NIN Personalisation
+            Route::prefix('nin-personalisation')->as('nin.personalisation.')->group(function () {
+                Route::get('/', [NinPersonalisationController::class, 'index'])->name('index');
+                Route::post('/', [NinPersonalisationController::class, 'store'])->name('store');
+                Route::get('/check/{id}', [NinPersonalisationController::class, 'checkStatus'])->name('check');
+            });
+
             // BVN Verification
             Route::prefix('bvn-verification')->group(function () {
                 Route::get('/', [BvnverificationController::class, 'index'])->name('bvn-verification');
@@ -267,6 +276,14 @@ Route::group(['prefix' => 'admin', 'as' => 'admin.', 'middleware' => ['auth', 'u
         Route::get('/bvn-crm/check/{id}', [AdminBvncrmController::class, 'checkStatus'])->name('bvn-crm.check');
         Route::post('/bvn-crm/batch-check', [AdminBvncrmController::class, 'batchCheck'])->name('bvn-crm.batch-check');
         Route::post('/bvn-crm/update-status/{id}', [AdminBvncrmController::class, 'updateStatus'])->name('bvn-crm.update-status');
+
+        // NIN Personalisation Management
+        Route::prefix('nin-personalisation')->name('nin-personalisation.')->group(function () {
+            Route::get('/', [AdminNinPersonalisationController::class, 'index'])->name('index');
+            Route::get('/check/{id}', [AdminNinPersonalisationController::class, 'checkStatus'])->name('check');
+            Route::post('/batch-check', [AdminNinPersonalisationController::class, 'batchCheck'])->name('batch-check');
+            Route::post('/update-status/{id}', [AdminNinPersonalisationController::class, 'updateStatus'])->name('update-status');
+        });
 
         Route::get('/{service}', [ServiceController::class, 'show'])->name('show');
         Route::put('/{service}', [ServiceController::class, 'update'])->name('update');

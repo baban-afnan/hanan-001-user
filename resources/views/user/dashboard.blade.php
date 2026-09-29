@@ -220,6 +220,7 @@
                                     ['icon' => 'bi-person-vcard', 'title' => 'NIN Demo Verify', 'desc' => 'Name & DOB', 'route' => 'user.nin.demo.index', 'color' => 'bg-secondary'],
                                     ['icon' => 'bi-shield-check', 'title' => 'BVN Verification', 'desc' => 'Secure check', 'route' => 'user.bvn-verification', 'color' => 'bg-danger'],
                                     ['icon' => 'bi-patch-check', 'title' => 'NIN Validation', 'desc' => 'Confirm records', 'route' => 'user.nin.validation.index', 'color' => 'bg-info'],
+                                    ['icon' => 'bi-person-badge', 'title' => 'NIN Personalisation', 'desc' => 'Card request', 'route' => 'user.nin.personalisation.index', 'color' => 'bg-primary'],
                                     ['icon' => 'bi-person-gear', 'title' => 'NIN Modification', 'desc' => 'Update details', 'route' => 'user.nin.modification.index', 'color' => 'bg-danger'],
                                     ['icon' => 'bi-bank', 'title' => 'BVN Modification', 'desc' => 'Bank records', 'route' => 'user.modification', 'color' => 'bg-dark'],
                                     ['icon' => 'bi-headset', 'title' => 'BVN CRM Service', 'desc' => 'Check status', 'route' => 'user.bvn-crm', 'color' => 'bg-primary'],

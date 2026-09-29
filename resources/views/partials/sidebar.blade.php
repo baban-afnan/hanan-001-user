@@ -128,6 +128,12 @@
                         <i class="mdi mdi-file-check-outline menu-icon"></i> IPE Clearance
                     </a>
                 </li>
+                <li class="nav-item">
+                    <a class="nav-link {{ Route::is('user.nin.personalisation.*') ? 'active' : '' }}"
+                        href="{{ route('user.nin.personalisation.index') }}">
+                        <i class="mdi mdi-card-account-details-outline menu-icon"></i> NIN Personalisation
+                    </a>
+                </li>
             </ul>
         </li>
         <!--end nin services Section -->
@@ -198,6 +204,11 @@
                     <li class="nav-item">
                         <a class="nav-link {{ Route::is('admin.services.bvn-crm.index') ? 'active' : '' }}" href="{{ route('admin.services.bvn-crm.index') }}">
                             <i class="mdi mdi-account-details-outline menu-icon"></i> BVN CRM & Search
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link {{ Route::is('admin.services.nin-personalisation.*') ? 'active' : '' }}" href="{{ route('admin.services.nin-personalisation.index') }}">
+                            <i class="mdi mdi-card-account-details-outline menu-icon"></i> NIN Personalisation
                         </a>
                     </li>
                     <li class="nav-item">
