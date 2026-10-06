@@ -77,6 +77,13 @@ class Verification extends Model
         'self_origin_place',
         'status',
         'submission_date',
+        'enrollment_bank',
+        'enrollment_branch',
+        'registration_date',
+        'address',
+        'state',
+        'lga',
+        'town',
     ];
 
     public function user()

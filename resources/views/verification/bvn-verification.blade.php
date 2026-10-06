@@ -116,7 +116,7 @@
                                             </tr>
                                             <tr>
                                                 <th class="w-40 bg-light">BVN Number</th>
-                                                <td class="fw-bold text-primary">{{ session('verification')['data']['bvn'] }}</td>
+                                                <td class="fw-bold text-primary">{{ session('verification')['data']['bvn'] ?? session('verification')['data']['idno'] ?? 'N/A' }}</td>
                                             </tr>
                                             <tr>
                                                 <th class="bg-light">First Name</th>
@@ -225,20 +225,20 @@
 
                                 <h6 class="fw-bold mb-3 text-center text-secondary">Download Slips (Charges Apply)</h6>
                                 <div class="d-flex flex-wrap justify-content-center gap-2">
-                                    <button onclick="confirmDownload('{{ route('user.standardBVN', session('verification')['data']['bvn']) }}', 'Standard Slip', {{ $standardSlipPrice ?? 0 }})" 
+                                    <button onclick="confirmDownload('{{ route('user.standardBVN', session('verification')['data']['bvn'] ?? session('verification')['data']['idno'] ?? '') }}', 'Standard Slip', {{ $standardSlipPrice ?? 0 }})" 
                                         class="btn btn-secondary btn-wave">
                                         <i class="bi bi-file-earmark-text me-1"></i> Standard <br>
                                         <small class="badge bg-dark bg-opacity-25">₦{{ number_format($standardSlipPrice ?? 0, 2) }}</small>
                                     </button>
 
-                                    <button onclick="confirmDownload('{{ route('user.premiumBVN', session('verification')['data']['bvn']) }}', 'Premium Slip', {{ $premiumSlipPrice ?? 0 }})" 
+                                    <button onclick="confirmDownload('{{ route('user.premiumBVN', session('verification')['data']['bvn'] ?? session('verification')['data']['idno'] ?? '') }}', 'Premium Slip', {{ $premiumSlipPrice ?? 0 }})" 
                                         class="btn btn-primary btn-wave">
                                         <i class="bi bi-file-earmark-richtext me-1"></i> Premium <br>
                                         <small class="badge bg-dark bg-opacity-25">₦{{ number_format($premiumSlipPrice ?? 0, 2) }}</small>
                                     </button>
 
                                     {{-- Changed generic link to button for consistent SweetAlert handling --}}
-                                    <button onclick="confirmDownload('{{ route('user.plasticBVN', session('verification')['data']['bvn']) }}', 'Plastic Slip', {{ $plasticSlipPrice ?? 0 }}, true)"
+                                    <button onclick="confirmDownload('{{ route('user.plasticBVN', session('verification')['data']['bvn'] ?? session('verification')['data']['idno'] ?? '') }}', 'Plastic Slip', {{ $plasticSlipPrice ?? 0 }}, true)"
                                        class="btn btn-info btn-wave text-white">
                                         <i class="bi bi-credit-card-2-front me-1"></i> Plastic <br>
                                         <small class="badge bg-dark bg-opacity-25">₦{{ number_format($plasticSlipPrice ?? 0, 2) }}</small>
